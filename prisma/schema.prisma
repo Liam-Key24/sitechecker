@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../node_modules/@prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id                    String   @id @default(cuid())
+  place_id              String   @unique
+  name                  String
+  website               String?
+  address               String?
+  phone                 String?
+  categories            String   // JSON array stored as string
+  google_rating         Float?
+  google_review_count   Int?
+  yelp_rating           Float?
+  yelp_review_count     Int?
+  yelp_match_confidence Float?
+  foursquare_rating    Float?
+  foursquare_popularity Float?
+  foursquare_match_confidence Float?
+  final_score           Float?
+  checked               Boolean  @default(false)
+  last_scanned          DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  analyses              Analysis[]
+  sourceSnapshots       SourceSnapshot[]
+
+  @@index([place_id])
+  @@index([final_score])
+  @@index([checked])
+}
+
+model Analysis {
+  id                String   @id @default(cuid())
+  businessId        String
+  pagespeed_score   Float?
+  yelp_score        Float?
+  foursquare_score  Float?
+  breakdown_json    String?  // JSON stored as string
+  created_at        DateTime @default(now())
+
+  business          Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+model SourceSnapshot {
+  id          String   @id @default(cuid())
+  businessId  String
+  provider    String   // 'google', 'yelp', 'foursquare'
+  raw_data    String   // JSON stored as string
+  created_at  DateTime @default(now())
+
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([provider])
+}
