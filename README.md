@@ -98,3 +98,4 @@ The opportunity score (0-100) is calculated as the **median** of available compo
 
 Private internal tool - not for public distribution.
 # sitechecker
+# sitehecker
