@@ -41,7 +41,11 @@ export default function ResultCard({ business, onToggleChecked, onAnalyze }: Res
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-md p-6 border-2 ${business.checked ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
+    <div
+      className={`bg-white rounded-lg shadow-md p-6 border-2 ${
+        business.checked ? 'border-primary/60 bg-primary/10' : 'border-gray-200'
+      }`}
+    >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
           <h3 className="text-xl font-semibold text-gray-900 mb-1">
@@ -64,7 +68,7 @@ export default function ResultCard({ business, onToggleChecked, onAnalyze }: Res
           onClick={() => onToggleChecked(business.id, !business.checked)}
           className={`ml-4 px-3 py-1 rounded text-sm font-medium transition-colors ${
             business.checked
-              ? 'bg-green-100 text-green-800 hover:bg-green-200'
+              ? 'bg-primary/25 text-gray-900 hover:bg-primary/35'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >

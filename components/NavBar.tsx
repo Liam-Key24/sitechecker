@@ -1,6 +1,6 @@
 "use client";
 
-import { LoginBtn, SignupBtn } from "@/components/Buttons/NavBtns";
+import { LoginBtn, SignupBtn } from "@/components/buttons/NavBtns";
 import { useState } from "react";
 import Link from "next/link";
 

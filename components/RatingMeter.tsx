@@ -12,7 +12,7 @@ function getColor(score: number) {
   if (score <= 30) return 'bg-red-500';
   if (score <= 60) return 'bg-yellow-500';
   if (score <= 80) return 'bg-blue-500';
-  return 'bg-green-500';
+  return 'bg-primary';
 }
 
 export default function RatingMeter({ label, score, sublabel }: RatingMeterProps) {

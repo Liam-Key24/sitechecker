@@ -320,7 +320,7 @@ export default function ResultsClient() {
             </button>
             <button
               onClick={handleExportCSV}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              className="px-4 py-2 bg-primary text-gray-900 rounded-lg hover:brightness-95 transition"
             >
               Export CSV
             </button>

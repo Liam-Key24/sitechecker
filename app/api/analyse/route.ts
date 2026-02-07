@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
             // Basic token overlap similarity (0-1) for a rough confidence.
             const n1 = business.name.toLowerCase().split(/\s+/);
             const n2 = match.name.toLowerCase().split(/\s+/);
-            const common = n1.filter((t) => n2.includes(t));
+            const common = n1.filter((t: string) => n2.includes(t));
             foursquareMatchConfidence = common.length / Math.max(n1.length, n2.length);
 
             const details = await getFoursquarePlaceDetails(match.fsq_id);

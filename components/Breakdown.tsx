@@ -51,7 +51,7 @@ export default function Breakdown({ data }: BreakdownProps) {
                         ? 'h-full bg-yellow-500'
                         : data.web_standards_score <= 80
                           ? 'h-full bg-blue-500'
-                          : 'h-full bg-green-500'
+                          : 'h-full bg-primary'
                   }
                   style={{ width: `${Math.min(100, Math.max(0, data.web_standards_score))}%` }}
                 />
