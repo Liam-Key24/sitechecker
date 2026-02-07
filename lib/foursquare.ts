@@ -1,5 +1,4 @@
 const FOURSQUARE_API_KEY = process.env.FOURSQUARE_API_KEY;
-const FOURSQUARE_API_SECRET = process.env.FOURSQUARE_API_SECRET;
 
 if (!FOURSQUARE_API_KEY) {
   console.warn('FOURSQUARE_API_KEY is not set');
@@ -44,6 +43,11 @@ export async function searchFoursquare(
       ll: `${latitude},${longitude}`,
       limit: '5',
     });
+    // Ask for the fields we care about, if supported.
+    params.set(
+      'fields',
+      'fsq_id,name,rating,popularity,location,categories,geocodes'
+    );
 
     const response = await fetch(
       `https://api.foursquare.com/v3/places/search?${params.toString()}`,
@@ -83,11 +87,44 @@ export async function searchFoursquare(
   }
 }
 
+export async function getFoursquarePlaceDetails(
+  fsqId: string
+): Promise<FoursquarePlace | null> {
+  if (!FOURSQUARE_API_KEY) return null;
+
+  try {
+    const params = new URLSearchParams({
+      fields: 'fsq_id,name,rating,popularity,location,categories,geocodes',
+    });
+
+    const response = await fetch(
+      `https://api.foursquare.com/v3/places/${encodeURIComponent(fsqId)}?${params.toString()}`,
+      {
+        headers: {
+          Authorization: FOURSQUARE_API_KEY,
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Foursquare details API error: ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data as FoursquarePlace;
+  } catch (error) {
+    console.error('Foursquare details error:', error);
+    return null;
+  }
+}
+
 function calculateMatchScore(
   searchName: string,
   placeName: string,
   searchLocation: string | undefined,
-  placeLocation: any
+  placeLocation: { locality?: string } | null | undefined
 ): number {
   let score = 0;
 
@@ -98,7 +135,7 @@ function calculateMatchScore(
   score += (commonTokens.length / Math.max(searchTokens.length, placeTokens.length)) * 0.7;
 
   // Location similarity
-  if (searchLocation && placeLocation.locality) {
+  if (searchLocation && placeLocation?.locality) {
     const searchLocLower = searchLocation.toLowerCase();
     if (searchLocLower.includes(placeLocation.locality.toLowerCase())) {
       score += 0.3;

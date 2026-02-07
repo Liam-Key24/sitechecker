@@ -7,11 +7,8 @@ export default function Home() {
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Website Opportunity Scanner
+              Site Checker
             </h1>
-            <p className="text-lg text-gray-600">
-              Find local businesses with no website or low-value websites for outreach opportunities
-            </p>
           </div>
           <SearchForm />
         </div>

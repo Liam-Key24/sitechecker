@@ -1,17 +1,6 @@
 import * as cheerio from 'cheerio';
 
-export interface WebsiteAnalysis {
-  hasHttps: boolean;
-  hasTitle: boolean;
-  hasMetaDescription: boolean;
-  hasH1: boolean;
-  hasSchema: boolean;
-  hasLocalBusinessSchema: boolean;
-  hasCTA: boolean;
-  hasContactForm: boolean;
-  hasReviews: boolean;
-  weaknessNotes: string[];
-}
+import type { WebsiteAnalysis } from '@/lib/contracts';
 
 export async function analyzeWebsite(url: string): Promise<WebsiteAnalysis> {
   const analysis: WebsiteAnalysis = {
@@ -21,6 +10,12 @@ export async function analyzeWebsite(url: string): Promise<WebsiteAnalysis> {
     hasH1: false,
     hasSchema: false,
     hasLocalBusinessSchema: false,
+    hasViewportMeta: false,
+    hasCanonical: false,
+    hasLangAttribute: false,
+    hasFavicon: false,
+    hasOpenGraph: false,
+    hasTwitterCard: false,
     hasCTA: false,
     hasContactForm: false,
     hasReviews: false,
@@ -42,6 +37,43 @@ export async function analyzeWebsite(url: string): Promise<WebsiteAnalysis> {
 
     const html = await response.text();
     const $ = cheerio.load(html);
+
+    // Modern-web basics
+    analysis.hasViewportMeta = $('meta[name="viewport"]').length > 0;
+    if (!analysis.hasViewportMeta) {
+      analysis.weaknessNotes.push('Missing viewport meta tag (mobile)');
+    }
+
+    analysis.hasCanonical = $('link[rel="canonical"]').length > 0;
+    if (!analysis.hasCanonical) {
+      analysis.weaknessNotes.push('Missing canonical link');
+    }
+
+    const lang = $('html').attr('lang')?.trim();
+    analysis.hasLangAttribute = Boolean(lang);
+    if (!analysis.hasLangAttribute) {
+      analysis.weaknessNotes.push('Missing <html lang> attribute');
+    }
+
+    analysis.hasFavicon =
+      $('link[rel="icon"]').length > 0 ||
+      $('link[rel="shortcut icon"]').length > 0 ||
+      $('link[rel="apple-touch-icon"]').length > 0;
+    if (!analysis.hasFavicon) {
+      analysis.weaknessNotes.push('Missing favicon');
+    }
+
+    const hasOgTitle = $('meta[property="og:title"]').attr('content');
+    const hasOgDesc = $('meta[property="og:description"]').attr('content');
+    analysis.hasOpenGraph = Boolean(hasOgTitle || hasOgDesc);
+    if (!analysis.hasOpenGraph) {
+      analysis.weaknessNotes.push('Missing Open Graph tags (social sharing)');
+    }
+
+    analysis.hasTwitterCard = $('meta[name="twitter:card"]').length > 0;
+    if (!analysis.hasTwitterCard) {
+      analysis.weaknessNotes.push('Missing Twitter Card meta');
+    }
 
     // Check title
     const title = $('title').text().trim();
@@ -86,7 +118,7 @@ export async function analyzeWebsite(url: string): Promise<WebsiteAnalysis> {
               analysis.hasLocalBusinessSchema = true;
             }
           }
-        } catch (e) {
+        } catch {
           // Invalid JSON, skip
         }
       });

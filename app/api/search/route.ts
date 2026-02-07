@@ -16,12 +16,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Build search query
+    // If user only provides a place name (e.g. "London"), Google Text Search often returns
+    // the place itself instead of actual businesses. Default to "businesses in <location>"
+    // when no filters are provided.
     let query = location;
-    if (category) {
-      query = `${category} ${query}`;
-    }
-    if (keywords) {
-      query = `${keywords} ${query}`;
+    if (!category && !keywords) {
+      query = `businesses in ${location}`;
+    } else {
+      if (category) {
+        query = `${category} ${query}`;
+      }
+      if (keywords) {
+        query = `${keywords} ${query}`;
+      }
     }
 
     // Search Google Places
@@ -176,9 +183,11 @@ export async function GET(request: NextRequest) {
             checked: updatedBusiness!.checked,
             breakdown,
           };
-        } catch (placeError: any) {
+        } catch (placeError: unknown) {
           console.error(`Error processing place ${place.place_id}:`, placeError);
-          console.error('Place error stack:', placeError?.stack);
+          if (placeError instanceof Error) {
+            console.error('Place error stack:', placeError.stack);
+          }
           // Return null for failed places, we'll filter them out
           return null;
         }
@@ -190,18 +199,17 @@ export async function GET(request: NextRequest) {
     console.log('Successfully processed', validBusinesses.length, 'out of', limitedPlaces.length, 'places');
 
     return NextResponse.json({ businesses: validBusinesses });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Search error:', error);
-    console.error('Error stack:', error?.stack);
-    console.error('Error details:', {
-      message: error?.message,
-      name: error?.name,
-      code: error?.code,
-    });
+    if (error instanceof Error) {
+      console.error('Error stack:', error.stack);
+    }
+    const message = error instanceof Error ? error.message : 'Failed to search businesses';
     return NextResponse.json(
       { 
-        error: error.message || 'Failed to search businesses',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: message,
+        details:
+          process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );

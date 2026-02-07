@@ -1,7 +1,8 @@
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const GOOGLE_PLACES_API_KEY =
+  process.env.GOOGLE_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
 
 if (!GOOGLE_PLACES_API_KEY) {
-  console.warn('GOOGLE_MAPS_API_KEY is not set');
+  console.warn('GOOGLE_API_KEY (or legacy GOOGLE_MAPS_API_KEY) is not set');
 }
 
 export interface GooglePlaceResult {
@@ -28,7 +29,7 @@ export async function searchGooglePlaces(
   type?: string
 ): Promise<GooglePlaceResult[]> {
   if (!GOOGLE_PLACES_API_KEY) {
-    throw new Error('GOOGLE_MAPS_API_KEY is not configured');
+    throw new Error('GOOGLE_API_KEY is not configured');
   }
 
   // Build query - if type is provided, use it as a filter, otherwise search for businesses in location
@@ -77,7 +78,7 @@ export async function searchGooglePlaces(
 
 export async function getPlaceDetails(placeId: string): Promise<GooglePlaceResult | null> {
   if (!GOOGLE_PLACES_API_KEY) {
-    throw new Error('GOOGLE_MAPS_API_KEY is not configured');
+    throw new Error('GOOGLE_API_KEY is not configured');
   }
 
   const params = new URLSearchParams({

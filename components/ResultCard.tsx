@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import ScoreBadge from './ScoreBadge';
 import Breakdown from './Breakdown';
+import RatingMeter from './RatingMeter';
+import type { AnalysisBreakdown } from '@/lib/contracts';
 
 interface Business {
   id: string;
@@ -17,12 +19,7 @@ interface Business {
   foursquare_rating: number | null;
   final_score: number | null;
   checked: boolean;
-  breakdown?: {
-    pagespeed_score: number | null;
-    foursquare_score: number | null;
-    final_score: number | null;
-    weakness_notes?: string[];
-  };
+  breakdown?: AnalysisBreakdown | null;
 }
 
 interface ResultCardProps {
@@ -35,7 +32,6 @@ export default function ResultCard({ business, onToggleChecked, onAnalyze }: Res
   const [analyzing, setAnalyzing] = useState(false);
 
   const handleAnalyze = async () => {
-    if (!business.website) return;
     setAnalyzing(true);
     try {
       await onAnalyze(business.id);
@@ -116,33 +112,58 @@ export default function ResultCard({ business, onToggleChecked, onAnalyze }: Res
             <span className="text-gray-600">⭐ {business.foursquare_rating.toFixed(1)}</span>
           </div>
         )}
+        {business.website && business.breakdown && (
+          <div>
+            <span className="font-medium text-gray-700">PageSpeed:</span>{' '}
+            <span className="text-gray-600">
+              {business.breakdown.pagespeed_score !== null
+                ? `${business.breakdown.pagespeed_score}/100`
+                : 'N/A'}
+              {business.breakdown.pagespeed?.desktopPerformance !== undefined
+                ? ` (desktop ${business.breakdown.pagespeed.desktopPerformance}/100)`
+                : ''}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
         <div className="flex-1">
-          <ScoreBadge score={business.final_score} size="md" />
+          <ScoreBadge
+            score={business.final_score}
+            size="md"
+            noWebsite={!business.website}
+            analyzed={Boolean(business.breakdown)}
+          />
+          {business.breakdown && (
+            <div className="mt-3 max-w-xl">
+              <RatingMeter
+                label="Website Standards"
+                score={business.breakdown.web_standards_score ?? null}
+                sublabel="Modern web standards (Lighthouse + on-page checks)"
+              />
+            </div>
+          )}
           {business.breakdown && <Breakdown data={business.breakdown} />}
         </div>
         <div className="flex gap-2 ml-4">
           {business.website && (
-            <>
-              <a
-                href={business.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Visit Site
-              </a>
-              <button
-                onClick={handleAnalyze}
-                disabled={analyzing}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {analyzing ? 'Analyzing...' : 'Analyze Website'}
-              </button>
-            </>
+            <a
+              href={business.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Visit Site
+            </a>
           )}
+          <button
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {analyzing ? 'Analyzing...' : business.website ? 'Analyze Website' : 'Analyze Presence'}
+          </button>
         </div>
       </div>
     </div>

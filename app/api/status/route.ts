@@ -19,10 +19,11 @@ export async function PATCH(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, checked: business.checked });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Status update error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to update status';
     return NextResponse.json(
-      { error: error.message || 'Failed to update status' },
+      { error: message },
       { status: 500 }
     );
   }

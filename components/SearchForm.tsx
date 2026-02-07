@@ -35,64 +35,93 @@ export default function SearchForm() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-4">
-      <div>
-        <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
-          Location (City or Postcode) *
-        </label>
-        <input
-          type="text"
-          id="location"
-          required
-          value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-          placeholder="e.g., London, UK or SW1A 1AA"
-        />
-      </div>
+      <div className="flex items-end gap-3">
+        <div className="flex-1">
+          <label
+            htmlFor="location"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Location (City or Postcode) *
+          </label>
+          <input
+            type="text"
+            id="location"
+            required
+            value={formData.location}
+            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+            placeholder="Search a location… (e.g., London, UK or SW1A 1AA)"
+          />
+        </div>
 
-      <div>
-        <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-          Industry/Category (Optional)
-        </label>
-        <input
-          type="text"
-          id="category"
-          value={formData.category}
-          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-          placeholder="e.g., restaurant, dentist, plumber"
-        />
-      </div>
+        <details className="relative shrink-0">
+          <summary className="list-none cursor-pointer select-none px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            Filters
+          </summary>
+          <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white shadow-lg p-4 z-10">
+            <div className="space-y-3">
+              <div>
+                <label
+                  htmlFor="category"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Industry/Category (Optional)
+                </label>
+                <input
+                  type="text"
+                  id="category"
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                  placeholder="e.g., restaurant, dentist, plumber"
+                />
+              </div>
 
-      <div>
-        <label htmlFor="keywords" className="block text-sm font-medium text-gray-700 mb-1">
-          Keywords (Optional)
-        </label>
-        <input
-          type="text"
-          id="keywords"
-          value={formData.keywords}
-          onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-          placeholder="e.g., organic, vegan, 24/7"
-        />
-      </div>
+              <div>
+                <label
+                  htmlFor="keywords"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Keywords (Optional)
+                </label>
+                <input
+                  type="text"
+                  id="keywords"
+                  value={formData.keywords}
+                  onChange={(e) =>
+                    setFormData({ ...formData, keywords: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                  placeholder="e.g., organic, vegan, 24/7"
+                />
+              </div>
 
-      <div>
-        <label htmlFor="limit" className="block text-sm font-medium text-gray-700 mb-1">
-          Number of Results
-        </label>
-        <select
-          id="limit"
-          value={formData.limit}
-          onChange={(e) => setFormData({ ...formData, limit: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-        >
-          <option value="10">10</option>
-          <option value="20">20</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
+              <div>
+                <label
+                  htmlFor="limit"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Number of Results
+                </label>
+                <select
+                  id="limit"
+                  value={formData.limit}
+                  onChange={(e) =>
+                    setFormData({ ...formData, limit: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
 
       <button

@@ -24,9 +24,9 @@ An internal Next.js web application that finds local businesses with no website 
    cp .env.local.example .env.local
    ```
 
-   Required API keys:
-   - `GOOGLE_MAPS_API_KEY` - Google Places API (required)
-   - `PAGESPEED_API_KEY` - Google PageSpeed Insights API (optional, for website analysis)
+  Required API keys:
+  - `GOOGLE_API_KEY` - Google APIs key (Places + PageSpeed) (required for search + analysis)
+    - Backwards compatible: `GOOGLE_MAPS_API_KEY` still works
    - `FOURSQUARE_API_KEY` - Foursquare Places API (optional, for enrichment)
 
 3. **Set up the database**:

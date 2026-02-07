@@ -1,67 +1,81 @@
-const PAGESPEED_API_KEY = process.env.PAGESPEED_API_KEY;
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
 
-if (!PAGESPEED_API_KEY) {
-  console.warn('PAGESPEED_API_KEY is not set');
+if (!GOOGLE_API_KEY) {
+  console.warn('GOOGLE_API_KEY (or legacy GOOGLE_MAPS_API_KEY) is not set');
 }
 
-export interface PageSpeedResult {
-  performance: number;
-  accessibility?: number;
-  bestPractices?: number;
-  seo?: number;
-  mobileFriendly: boolean;
-  coreWebVitals?: {
-    lcp?: number;
-    inp?: number;
-    cls?: number;
-  };
-}
+import type { PageSpeedResult } from '@/lib/contracts';
 
 export async function analyzePageSpeed(url: string): Promise<PageSpeedResult | null> {
-  if (!PAGESPEED_API_KEY) {
+  if (!GOOGLE_API_KEY) {
     return null;
   }
 
   try {
-    // Analyze mobile version
-    const mobileParams = new URLSearchParams({
-      url,
-      key: PAGESPEED_API_KEY,
-      strategy: 'mobile',
-      category: 'performance',
-    });
+    const fetchStrategy = async (
+      strategy: 'mobile' | 'desktop'
+    ): Promise<PageSpeedResult | null> => {
+      const params = new URLSearchParams({
+        url,
+        key: GOOGLE_API_KEY,
+        strategy,
+      });
+      params.append('category', 'performance');
+      params.append('category', 'accessibility');
+      params.append('category', 'best-practices');
+      params.append('category', 'seo');
 
-    const mobileResponse = await fetch(
-      `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?${mobileParams.toString()}`
-    );
+      const response = await fetch(
+        `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?${params.toString()}`
+      );
 
-    if (!mobileResponse.ok) {
-      console.error(`PageSpeed API error: ${mobileResponse.statusText}`);
-      return null;
-    }
+      if (!response.ok) {
+        console.error(`PageSpeed API error (${strategy}): ${response.statusText}`);
+        return null;
+      }
 
-    const mobileData = await mobileResponse.json();
+      const data = await response.json();
+      const cats = data.lighthouseResult?.categories;
 
-    const performance = mobileData.lighthouseResult?.categories?.performance?.score
-      ? Math.round(mobileData.lighthouseResult.categories.performance.score * 100)
-      : 0;
+      const perfScore = cats?.performance?.score;
+      const accScore = cats?.accessibility?.score;
+      const bpScore = cats?.['best-practices']?.score;
+      const seoScore = cats?.seo?.score;
 
-    const mobileFriendly =
-      mobileData.lighthouseResult?.audits?.['viewport']?.score === 1 &&
-      mobileData.lighthouseResult?.audits?.['uses-responsive-images']?.score === 1;
+      const audits = data.lighthouseResult?.audits;
+      const viewportOk = audits?.['viewport']?.score === 1;
+      const responsiveImagesOk = audits?.['uses-responsive-images']?.score === 1;
 
-    const lcp = mobileData.lighthouseResult?.audits?.['largest-contentful-paint']?.numericValue;
-    const cls = mobileData.lighthouseResult?.audits?.['cumulative-layout-shift']?.numericValue;
-    const inp = mobileData.loadingExperience?.metrics?.INTERACTION_TO_NEXT_PAINT?.percentile;
+      const lcp = audits?.['largest-contentful-paint']?.numericValue;
+      const cls = audits?.['cumulative-layout-shift']?.numericValue;
+      const inp = data.loadingExperience?.metrics?.INTERACTION_TO_NEXT_PAINT?.percentile;
 
+      return {
+        performance: perfScore ? Math.round(perfScore * 100) : 0,
+        accessibility: accScore ? Math.round(accScore * 100) : undefined,
+        bestPractices: bpScore ? Math.round(bpScore * 100) : undefined,
+        seo: seoScore ? Math.round(seoScore * 100) : undefined,
+        mobileFriendly: strategy === 'mobile' ? Boolean(viewportOk && responsiveImagesOk) : false,
+        coreWebVitals: {
+          lcp: lcp ? Math.round(lcp) : undefined,
+          cls: typeof cls === 'number' ? Math.round(cls * 100) / 100 : undefined,
+          inp: typeof inp === 'number' ? Math.round(inp) : undefined,
+        },
+      };
+    };
+
+    const [mobile, desktop] = await Promise.all([
+      fetchStrategy('mobile'),
+      fetchStrategy('desktop'),
+    ]);
+
+    if (!mobile && !desktop) return null;
+
+    // Prefer mobile as the primary score; attach desktop perf if available.
+    const primary = mobile ?? desktop!;
     return {
-      performance,
-      mobileFriendly: mobileFriendly || false,
-      coreWebVitals: {
-        lcp: lcp ? Math.round(lcp) : undefined,
-        cls: cls ? Math.round(cls * 100) / 100 : undefined,
-        inp: inp ? Math.round(inp) : undefined,
-      },
+      ...primary,
+      desktopPerformance: desktop?.performance,
     };
   } catch (error) {
     console.error('PageSpeed analysis error:', error);
