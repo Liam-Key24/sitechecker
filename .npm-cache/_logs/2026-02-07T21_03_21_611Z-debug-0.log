@@ -1,0 +1,172 @@
+0 verbose cli /usr/local/bin/node /usr/local/bin/npm
+1 info using npm@11.6.2
+2 info using node@v25.0.0
+3 silly config load:file:/usr/local/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/liamgk/Desktop/sitecheck/.npmrc
+5 silly config load:file:/Users/liamgk/.npmrc
+6 silly config load:file:/Users/liamgk/.npm-global/etc/npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" "./.npm-cache"
+9 verbose logfile logs-max:10 dir:/Users/liamgk/Desktop/sitecheck/.npm-cache/_logs/2026-02-07T21_03_21_611Z-
+10 verbose logfile /Users/liamgk/Desktop/sitecheck/.npm-cache/_logs/2026-02-07T21_03_21_611Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 verbose shrinkwrap failed to load node_modules/.package-lock.json out of date, updated: node_modules
+14 silly idealTree buildDeps
+15 silly fetch manifest eslint-config-prettier@^10.1.8
+16 silly packumentCache full:https://registry.npmjs.org/eslint-config-prettier cache-miss
+17 http cache https://registry.npmjs.org/eslint-config-prettier 5ms (cache hit)
+18 silly packumentCache full:https://registry.npmjs.org/eslint-config-prettier set size:231551 disposed:false
+19 silly fetch manifest eslint@^9
+20 silly packumentCache full:https://registry.npmjs.org/eslint cache-miss
+21 http cache https://registry.npmjs.org/eslint 2ms (cache hit)
+22 silly packumentCache full:https://registry.npmjs.org/eslint set size:1929113 disposed:false
+23 silly fetch manifest jiti@*
+24 silly packumentCache full:https://registry.npmjs.org/jiti cache-miss
+25 http cache https://registry.npmjs.org/jiti 2ms (cache hit)
+26 silly packumentCache full:https://registry.npmjs.org/jiti set size:382310 disposed:false
+27 silly fetch manifest prettier@^3.6.2
+28 silly packumentCache full:https://registry.npmjs.org/prettier cache-miss
+29 http cache https://registry.npmjs.org/prettier 26ms (cache hit)
+30 silly packumentCache full:https://registry.npmjs.org/prettier set size:653745 disposed:false
+31 silly fetch manifest prettier-plugin-tailwindcss@^0.6.14
+32 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-tailwindcss cache-miss
+33 http cache https://registry.npmjs.org/prettier-plugin-tailwindcss 38ms (cache hit)
+34 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-tailwindcss set size:1227751 disposed:false
+35 silly fetch manifest @ianvs/prettier-plugin-sort-imports@*
+36 silly packumentCache full:https://registry.npmjs.org/@ianvs%2fprettier-plugin-sort-imports cache-miss
+37 http cache https://registry.npmjs.org/@ianvs%2fprettier-plugin-sort-imports 1ms (cache hit)
+38 silly packumentCache full:https://registry.npmjs.org/@ianvs%2fprettier-plugin-sort-imports set size:159151 disposed:false
+39 silly fetch manifest @prettier/plugin-oxc@^0.0.4 || ^0.1.0
+40 silly packumentCache full:https://registry.npmjs.org/@prettier%2fplugin-oxc cache-miss
+41 http cache https://registry.npmjs.org/@prettier%2fplugin-oxc 1ms (cache hit)
+42 silly packumentCache full:https://registry.npmjs.org/@prettier%2fplugin-oxc set size:23820 disposed:false
+43 silly fetch manifest @vue/compiler-sfc@2.7.x || 3.x
+44 silly packumentCache full:https://registry.npmjs.org/@vue%2fcompiler-sfc cache-miss
+45 http cache https://registry.npmjs.org/@vue%2fcompiler-sfc 2ms (cache hit)
+46 silly packumentCache full:https://registry.npmjs.org/@vue%2fcompiler-sfc set size:932949 disposed:false
+47 silly fetch manifest content-tag@^4.0.0
+48 silly packumentCache full:https://registry.npmjs.org/content-tag cache-miss
+49 http cache https://registry.npmjs.org/content-tag 2ms (cache hit)
+50 silly packumentCache full:https://registry.npmjs.org/content-tag set size:46609 disposed:false
+51 silly fetch manifest prettier-plugin-ember-template-tag@^2.1.0
+52 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-ember-template-tag cache-miss
+53 http cache https://registry.npmjs.org/prettier-plugin-ember-template-tag 4ms (cache hit)
+54 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-ember-template-tag set size:122485 disposed:false
+55 silly fetch manifest @prettier/plugin-hermes@*
+56 silly packumentCache full:https://registry.npmjs.org/@prettier%2fplugin-hermes cache-miss
+57 http cache https://registry.npmjs.org/@prettier%2fplugin-hermes 1ms (cache hit)
+58 silly packumentCache full:https://registry.npmjs.org/@prettier%2fplugin-hermes set size:18790 disposed:false
+59 silly fetch manifest @prettier/plugin-pug@*
+60 silly packumentCache full:https://registry.npmjs.org/@prettier%2fplugin-pug cache-miss
+61 http cache https://registry.npmjs.org/@prettier%2fplugin-pug 1ms (cache hit)
+62 silly packumentCache full:https://registry.npmjs.org/@prettier%2fplugin-pug set size:422754 disposed:false
+63 silly fetch manifest @shopify/prettier-plugin-liquid@*
+64 silly packumentCache full:https://registry.npmjs.org/@shopify%2fprettier-plugin-liquid cache-miss
+65 http cache https://registry.npmjs.org/@shopify%2fprettier-plugin-liquid 1ms (cache hit)
+66 silly packumentCache full:https://registry.npmjs.org/@shopify%2fprettier-plugin-liquid set size:248543 disposed:false
+67 silly fetch manifest @trivago/prettier-plugin-sort-imports@*
+68 silly packumentCache full:https://registry.npmjs.org/@trivago%2fprettier-plugin-sort-imports cache-miss
+69 http cache https://registry.npmjs.org/@trivago%2fprettier-plugin-sort-imports 1ms (cache hit)
+70 silly packumentCache full:https://registry.npmjs.org/@trivago%2fprettier-plugin-sort-imports set size:156744 disposed:false
+71 silly fetch manifest prettier-plugin-svelte@3.x
+72 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-svelte cache-miss
+73 http cache https://registry.npmjs.org/prettier-plugin-svelte 1ms (cache hit)
+74 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-svelte set size:189328 disposed:false
+75 silly fetch manifest svelte@^3.2.0 || ^4.0.0-next.0 || ^5.0.0-next.0
+76 silly packumentCache full:https://registry.npmjs.org/svelte cache-miss
+77 http cache https://registry.npmjs.org/svelte 3ms (cache hit)
+78 silly packumentCache full:https://registry.npmjs.org/svelte set size:4517254 disposed:false
+79 silly fetch manifest @zackad/prettier-plugin-twig@*
+80 silly packumentCache full:https://registry.npmjs.org/@zackad%2fprettier-plugin-twig cache-miss
+81 http cache https://registry.npmjs.org/@zackad%2fprettier-plugin-twig 0ms (cache hit)
+82 silly packumentCache full:https://registry.npmjs.org/@zackad%2fprettier-plugin-twig set size:48794 disposed:false
+83 silly fetch manifest prettier-plugin-astro@*
+84 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-astro cache-miss
+85 http cache https://registry.npmjs.org/prettier-plugin-astro 1ms (cache hit)
+86 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-astro set size:143154 disposed:false
+87 silly fetch manifest prettier-plugin-css-order@*
+88 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-css-order cache-miss
+89 http cache https://registry.npmjs.org/prettier-plugin-css-order 1ms (cache hit)
+90 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-css-order set size:27601 disposed:false
+91 silly fetch manifest prettier-plugin-import-sort@*
+92 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-import-sort cache-miss
+93 http cache https://registry.npmjs.org/prettier-plugin-import-sort 1ms (cache hit)
+94 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-import-sort set size:20848 disposed:false
+95 silly fetch manifest prettier-plugin-jsdoc@*
+96 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-jsdoc cache-miss
+97 http cache https://registry.npmjs.org/prettier-plugin-jsdoc 1ms (cache hit)
+98 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-jsdoc set size:443961 disposed:false
+99 silly fetch manifest prettier-plugin-marko@*
+100 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-marko cache-miss
+101 http cache https://registry.npmjs.org/prettier-plugin-marko 1ms (cache hit)
+102 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-marko set size:229026 disposed:false
+103 silly fetch manifest prettier-plugin-multiline-arrays@*
+104 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-multiline-arrays cache-miss
+105 http cache https://registry.npmjs.org/prettier-plugin-multiline-arrays 1ms (cache hit)
+106 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-multiline-arrays set size:119694 disposed:false
+107 silly fetch manifest prettier-plugin-organize-attributes@*
+108 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-organize-attributes cache-miss
+109 http cache https://registry.npmjs.org/prettier-plugin-organize-attributes 0ms (cache hit)
+110 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-organize-attributes set size:24634 disposed:false
+111 silly fetch manifest prettier-plugin-organize-imports@*
+112 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-organize-imports cache-miss
+113 http cache https://registry.npmjs.org/prettier-plugin-organize-imports 1ms (cache hit)
+114 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-organize-imports set size:92386 disposed:false
+115 silly fetch manifest typescript@^5
+116 silly packumentCache full:https://registry.npmjs.org/typescript cache-miss
+117 http cache https://registry.npmjs.org/typescript 10ms (cache hit)
+118 silly packumentCache full:https://registry.npmjs.org/typescript set size:15216073 disposed:false
+119 silly fetch manifest vue-tsc@^2.1.0 || 3
+120 silly packumentCache full:https://registry.npmjs.org/vue-tsc cache-miss
+121 http cache https://registry.npmjs.org/vue-tsc 2ms (cache hit)
+122 silly packumentCache full:https://registry.npmjs.org/vue-tsc set size:733860 disposed:false
+123 silly fetch manifest prettier-plugin-sort-imports@*
+124 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-sort-imports cache-miss
+125 http cache https://registry.npmjs.org/prettier-plugin-sort-imports 1ms (cache hit)
+126 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-sort-imports set size:117008 disposed:false
+127 silly fetch manifest prettier-plugin-style-order@*
+128 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-style-order cache-miss
+129 http cache https://registry.npmjs.org/prettier-plugin-style-order 1ms (cache hit)
+130 silly packumentCache full:https://registry.npmjs.org/prettier-plugin-style-order set size:12237 disposed:false
+131 silly placeDep ROOT eslint-config-prettier@10.1.8 OK for: sitecheck@0.1.0 want: ^10.1.8
+132 silly placeDep ROOT prettier@3.8.1 OK for: sitecheck@0.1.0 want: ^3.6.2
+133 silly placeDep ROOT prettier-plugin-tailwindcss@0.6.14 OK for: sitecheck@0.1.0 want: ^0.6.14
+134 silly reify mark retired [ '/Users/liamgk/Desktop/sitecheck/node_modules/next' ]
+135 silly reify mark retired [
+135 silly reify   '/Users/liamgk/Desktop/sitecheck/node_modules/@next/swc-darwin-arm64'
+135 silly reify ]
+136 silly reify mark retired [
+136 silly reify   '/Users/liamgk/Desktop/sitecheck/node_modules/@phosphor-icons/react'
+136 silly reify ]
+137 silly reify mark retired [ '/Users/liamgk/Desktop/sitecheck/node_modules/@next/env' ]
+138 silly reify moves {
+138 silly reify   '/Users/liamgk/Desktop/sitecheck/node_modules/next': '/Users/liamgk/Desktop/sitecheck/node_modules/.next-8QxSO7IK',
+138 silly reify   '/Users/liamgk/Desktop/sitecheck/node_modules/@next/swc-darwin-arm64': '/Users/liamgk/Desktop/sitecheck/node_modules/@next/.swc-darwin-arm64-5SyZUSfg',
+138 silly reify   '/Users/liamgk/Desktop/sitecheck/node_modules/@phosphor-icons/react': '/Users/liamgk/Desktop/sitecheck/node_modules/@phosphor-icons/.react-NjWcJdOM',
+138 silly reify   '/Users/liamgk/Desktop/sitecheck/node_modules/@next/env': '/Users/liamgk/Desktop/sitecheck/node_modules/@next/.env-JpqwbNS7'
+138 silly reify }
+139 verbose stack Error: ENOTEMPTY: directory not empty, rename '/Users/liamgk/Desktop/sitecheck/node_modules/next' -> '/Users/liamgk/Desktop/sitecheck/node_modules/.next-8QxSO7IK'
+139 verbose stack     at async Object.rename (node:internal/fs/promises:786:10)
+139 verbose stack     at async moveFile (/usr/local/lib/node_modules/npm/node_modules/@npmcli/fs/lib/move-file.js:30:5)
+139 verbose stack     at async Promise.allSettled (index 0)
+139 verbose stack     at async [reifyPackages] (/usr/local/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:313:11)
+139 verbose stack     at async Arborist.reify (/usr/local/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:125:5)
+139 verbose stack     at async Install.exec (/usr/local/lib/node_modules/npm/lib/commands/install.js:150:5)
+139 verbose stack     at async Npm.exec (/usr/local/lib/node_modules/npm/lib/npm.js:208:9)
+139 verbose stack     at async module.exports (/usr/local/lib/node_modules/npm/lib/cli/entry.js:67:5)
+140 error code ENOTEMPTY
+141 error syscall rename
+142 error path /Users/liamgk/Desktop/sitecheck/node_modules/next
+143 error dest /Users/liamgk/Desktop/sitecheck/node_modules/.next-8QxSO7IK
+144 error errno -66
+145 error ENOTEMPTY: directory not empty, rename '/Users/liamgk/Desktop/sitecheck/node_modules/next' -> '/Users/liamgk/Desktop/sitecheck/node_modules/.next-8QxSO7IK'
+146 silly unfinished npm timer reify 1770498201684
+147 silly unfinished npm timer reify:retireShallow 1770498201925
+148 verbose cwd /Users/liamgk/Desktop/sitecheck
+149 verbose os Darwin 24.5.0
+150 verbose node v25.0.0
+151 verbose npm  v11.6.2
+152 verbose exit -66
+153 verbose code -66
+154 error A complete log of this run can be found in: /Users/liamgk/Desktop/sitecheck/.npm-cache/_logs/2026-02-07T21_03_21_611Z-debug-0.log
