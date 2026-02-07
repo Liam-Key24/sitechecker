@@ -76,11 +76,13 @@ export async function POST(request: NextRequest) {
     await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'app/api/analyse/route.ts:POST:entry',message:'POST /api/analyse entry',data:{method:request.method,url:request.url,contentType:request.headers.get('content-type')},timestamp:Date.now()});
     // #endregion
 
-    const body = await request.json();
-    const { businessId } = body as { businessId?: string; force?: boolean };
+    const body: unknown = await request.json();
+    const businessId =
+      isRecord(body) && typeof body.businessId === 'string' ? body.businessId : undefined;
+    const force = isRecord(body) && typeof body.force === 'boolean' ? body.force : undefined;
 
     // #region agent log (E)
-    await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'app/api/analyse/route.ts:POST:body',message:'parsed request.json()',data:{hasBusinessId:typeof businessId==='string' && businessId.length>0,force:isRecord(body)?(body as any).force ?? null:null},timestamp:Date.now()});
+    await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'app/api/analyse/route.ts:POST:body',message:'parsed request.json()',data:{hasBusinessId:typeof businessId==='string' && businessId.length>0,force:force ?? null},timestamp:Date.now()});
     // #endregion
 
     if (!businessId) {
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (recentAnalysis && !body?.force) {
+    if (recentAnalysis && !force) {
       const breakdownUnknown: unknown = recentAnalysis.breakdown_json
         ? JSON.parse(recentAnalysis.breakdown_json)
         : null;
