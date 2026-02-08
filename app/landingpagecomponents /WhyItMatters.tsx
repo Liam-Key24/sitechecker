@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CurrencyDollar } from "phosphor-react";
 
 function useCountUp(
   target: number,
@@ -83,12 +84,18 @@ export default function WhyItMattersSection() {
   // Simple placeholder counters (swap to real data later)
   const noWebsiteTarget = 1284000;
   const outdatedTarget = 762000;
+  const potentialProfitTarget = 1200; // display as £1.2B (from no-website segment)
 
   const noWebsite = useCountUp(noWebsiteTarget, { start: hasEnteredView });
   const outdated = useCountUp(outdatedTarget, { flicker: true, start: hasEnteredView });
+  const potentialProfit = useCountUp(potentialProfitTarget, { start: hasEnteredView });
 
   const noWebsiteText = useMemo(() => noWebsite.toLocaleString(), [noWebsite]);
   const outdatedText = useMemo(() => outdated.toLocaleString(), [outdated]);
+  const potentialProfitText = useMemo(
+    () => `£${(potentialProfit / 1000).toFixed(1)}B`,
+    [potentialProfit]
+  );
 
   return (
     <section
@@ -100,34 +107,34 @@ export default function WhyItMattersSection() {
     >
 
       <div className="mt-10 grid gap-6 md:grid-cols-3">
-        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center">
-          <div className="text-4xl font-semibold tracking-tight text-gray-900">
+        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center min-h-96  shadow-lg shadow-black/10">
+
+          <div className="text-7xl font-semibold tracking-tight text-primary">
+            
             {noWebsiteText}
           </div>
-          <p className="mt-2 text-sm leading-6 text-gray-600">
+          <p className="mt-2 text-xl leading-6 text-gray-600 text-center">
             Businesses found with <span className="font-bold">no website</span>.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center">
-          <div className="text-4xl font-semibold tracking-tight text-gray-900">
+        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center min-h-96  shadow-lg shadow-black/10">
+          <div className="text-7xl font-semibold tracking-tight text-primary">
             {outdatedText}
           </div>
-          <p className="mt-2 text-sm leading-6 text-gray-600">
-            Websites that <span className="font-medium">don’t meet modern web standards</span>.
+          <p className="mt-2 text-xl leading-6 text-gray-600 text-center">
+            Websites that <span className="font-bold"> don’t meet </span> modern web standards.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Potential gain
-              </h3>
-              <div className="flex items-center gap-2">
-                <DollarIcon />
-                <DollarIcon className="opacity-90" />
-                <DollarIcon className="opacity-80" />
-              </div>
-            </div>
+        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center min-h-96  shadow-lg shadow-black/10">
+          <div className="text-7xl font-semibold tracking-tight text-primary">
+            {potentialProfitText}
+          </div>
+          <p className="mt-2 text-xl leading-6 text-gray-600 text-center">
+            Potential profit for both businesses and developers.
+          </p>
+        </div>
       </div>
 
 

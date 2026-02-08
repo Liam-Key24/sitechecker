@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
 const navLinks = [
-  { label: "App", href: "#" },
+  { label: "Search", href: "/search" },
   { label: "Contact me", href: "#" },
 ] as const;
 
@@ -34,7 +34,7 @@ export function Navbar() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Link
-              href="#"
+              href="/"
               className="text-lg font-semibold tracking-tight text-black"
               >
               FreshLeaf
@@ -45,7 +45,7 @@ export function Navbar() {
                 <Link
                 key={link.label}
                 href={link.href}
-                className="text-sm text-black transition hover:text-foreground"
+                className="text-sm text-black transition hover:text-black/80"
                 >
                   {link.label}
                 </Link>
@@ -56,7 +56,7 @@ export function Navbar() {
           <div className="hidden items-center gap-2 sm:flex">
             <Link
               href="#"
-              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-black transition hover:bg-white/15 hover:text-foreground"
+              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-black transition hover:bg-black/10 hover:text-black"
               >
               Account
             </Link>
@@ -74,7 +74,7 @@ export function Navbar() {
             aria-expanded={isOpen}
             aria-controls={menuId}
             onClick={() => setIsOpen((v) => !v)}
-            className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 p-2 text-black transition hover:bg-white/15 hover:text-foreground sm:hidden"
+            className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 p-2 text-black transition hover:bg-black/10 hover:text-black sm:hidden"
             >
             <svg
               viewBox="0 0 24 24"
@@ -113,7 +113,7 @@ export function Navbar() {
                 key={link.label}
                 href={link.href}
                 onClick={() => setIsOpen(false)}
-                className="rounded-lg px-2 py-2 text-sm text-foreground/80 transition hover:bg-white/10 hover:text-foreground"
+                className="rounded-lg px-2 py-2 text-sm text-foreground/80 transition hover:bg-black/10 hover:text-black"
                 >
                   {link.label}
                 </Link>
@@ -124,7 +124,7 @@ export function Navbar() {
               <Link
                 href="#"
                 onClick={() => setIsOpen(false)}
-                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-foreground/90 transition hover:bg-white/15 hover:text-foreground"
+                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-foreground/90 transition hover:bg-black/10 hover:text-black"
                 >
                 Account
               </Link>

@@ -9,7 +9,6 @@ export default function Home() {
   return (
     <main className="">
       <Hero />
-      <SearchFormSection />
       <WhyItMattersSection />
       <MissionSection />
       <HowItWorksSection />
