@@ -48,12 +48,11 @@ function DollarIcon({ className }: { className?: string }) {
   return (
     <div
       className={[
-        "inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-lg font-semibold text-gray-900 shadow-sm",
+        "inline-flex h-10 w-10 items-center justify-center  text-lg font-semibold text-primary/80",
         className,
       ].join(" ")}
       aria-hidden="true"
     >
-      $
     </div>
   );
 }
@@ -99,21 +98,18 @@ export default function WhyItMattersSection() {
         hasEnteredView ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0",
       ].join(" ")}
     >
-      <h2 className="text-3xl font-semibold tracking-tight text-gray-900">
-        Why it matters
-      </h2>
 
       <div className="mt-10 grid gap-6 md:grid-cols-3">
-        <div className="rounded-2xl border border-black/10 bg-white p-8">
+        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center">
           <div className="text-4xl font-semibold tracking-tight text-gray-900">
             {noWebsiteText}
           </div>
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            Businesses found with <span className="font-medium">no website</span>.
+            Businesses found with <span className="font-bold">no website</span>.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-black/10 bg-white p-8">
+        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center">
           <div className="text-4xl font-semibold tracking-tight text-gray-900">
             {outdatedText}
           </div>
@@ -122,28 +118,20 @@ export default function WhyItMattersSection() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-black/10 bg-white p-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
+        <div className="rounded-2xl border border-black/10 bg-white p-8 flex flex-col justify-center items-center">
               <h3 className="text-lg font-semibold text-gray-900">
                 Potential gain
               </h3>
-              <p className="mt-1 text-sm leading-6 text-gray-600">
-                Real opportunities to help businesses turn over a new leaf.
-              </p>
+              <div className="flex items-center gap-2">
+                <DollarIcon />
+                <DollarIcon className="opacity-90" />
+                <DollarIcon className="opacity-80" />
+              </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <DollarIcon />
-              <DollarIcon className="opacity-90" />
-              <DollarIcon className="opacity-80" />
-            </div>
-          </div>
-        </div>
       </div>
 
-      
-      
+
+
     </section>
   );
 }

@@ -141,13 +141,27 @@ export default function ResultsClient() {
           ...(category && { category }),
           ...(keywords && { keywords }),
         });
+        const url = `/api/search?${params.toString()}`;
+        const response = await fetch(url);
+        const bodyText = await response.text();
 
-        const response = await fetch(`/api/search?${params.toString()}`);
-        const data = await response.json();
+        let data: { businesses?: unknown[]; error?: string };
+        try {
+          data = JSON.parse(bodyText);
+        } catch {
+          // Server returned non-JSON (e.g. HTML error page)
+          const msg = response.status >= 500
+            ? 'Server error. Please try again later.'
+            : 'Something went wrong. Please try again.';
+          alert(msg);
+          setBusinesses([]);
+          setLoading(false);
+          return;
+        }
 
         if (!response.ok) {
           console.error('API Error:', data);
-          alert(`Error: ${data.error || 'Failed to fetch results'}`);
+          alert(`Error: ${data.error ?? 'Failed to fetch results'}`);
           setBusinesses([]);
           return;
         }

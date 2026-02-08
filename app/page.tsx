@@ -10,9 +10,9 @@ export default function Home() {
     <main className="">
       <Hero />
       <SearchFormSection />
-      <HowItWorksSection />
       <WhyItMattersSection />
       <MissionSection />
+      <HowItWorksSection />
       <WhoItsForSection />
       <EthicalNoteSection />
     </main>

@@ -10,42 +10,53 @@ const sentences = [
 
 export default function MissionSection() {
   const sectionRef = useRef<HTMLElement | null>(null);
-  const [hasEnteredView, setHasEnteredView] = useState(false);
+  const intervalRef = useRef<number | null>(null);
+  const [isInView, setIsInView] = useState(false);
   const [visibleCount, setVisibleCount] = useState(0);
 
+  // Only run animation when section is on screen
   useEffect(() => {
     const el = sectionRef.current;
     if (!el) return;
-    if (hasEnteredView) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setHasEnteredView(true);
-          observer.disconnect();
-        }
+        const entry = entries[0];
+        if (!entry) return;
+        setIsInView(entry.isIntersecting);
       },
       { threshold: 0.25 }
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasEnteredView]);
+    return () => {
+      observer.disconnect();
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+    };
+  }, []);
 
   useEffect(() => {
-    if (!hasEnteredView) return;
+    if (!isInView) return;
 
     setVisibleCount(0);
-    const interval = window.setInterval(() => {
+    intervalRef.current = window.setInterval(() => {
       setVisibleCount((c) => {
         const next = c + 1;
-        if (next >= sentences.length) window.clearInterval(interval);
+        if (next >= sentences.length && intervalRef.current) {
+          window.clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
         return Math.min(sentences.length, next);
       });
     }, 520);
 
-    return () => window.clearInterval(interval);
-  }, [hasEnteredView]);
+    return () => {
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isInView]);
 
   return (
     <section
