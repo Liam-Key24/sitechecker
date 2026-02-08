@@ -5,10 +5,11 @@ import type { AnalysisBreakdown } from '@/lib/contracts';
 
 interface BreakdownProps {
   data: AnalysisBreakdown;
+  initialOpen?: boolean;
 }
 
-export default function Breakdown({ data }: BreakdownProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function Breakdown({ data, initialOpen = false }: BreakdownProps) {
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const weaknessNotes = data.weakness_notes ?? [];
   const noWebsite = weaknessNotes.includes('No website found');
 
