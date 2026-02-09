@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ListChecks, Globe } from 'phosphor-react';
+import Link from 'next/link';
+import { ListChecks, Globe, Star, Check, CheckCircle } from 'phosphor-react';
 import ScoreBadge from './ScoreBadge';
 import Breakdown from './Breakdown';
 import type { AnalysisBreakdown } from '@/lib/contracts';
@@ -39,6 +40,8 @@ interface ResultCardProps {
   business: Business;
   onToggleChecked: (id: string, checked: boolean) => void;
   onAnalyze: (id: string) => Promise<void>;
+  /** Pass from results page so Contact page can link back with same search */
+  resultsLocation?: string | null;
 }
 
 function statusTag(business: Business) {
@@ -47,14 +50,14 @@ function statusTag(business: Business) {
   return { label: 'Not analyzed', className: 'bg-gray-100 text-gray-700' };
 }
 
-export default function ResultCard({ business, onToggleChecked, onAnalyze }: ResultCardProps) {
+export default function ResultCard({ business, onToggleChecked, onAnalyze, resultsLocation }: ResultCardProps) {
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const status = statusTag(business);
   const score = business.final_score ?? business.breakdown?.web_standards_score ?? null;
   const progress = score !== null ? Math.min(100, Math.max(0, score)) : 0;
 
-  const contactHref = business.website || (business.phone ? `tel:${business.phone}` : null) || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((business.name + (business.address ? ` ${business.address}` : '')))}`;
+  const contactPageHref = `/results/contact?businessId=${encodeURIComponent(business.id)}${resultsLocation ? `&location=${encodeURIComponent(resultsLocation)}` : ''}`;
 
   return (
     <div
@@ -94,19 +97,26 @@ export default function ResultCard({ business, onToggleChecked, onAnalyze }: Res
             analyzed={Boolean(business.breakdown)}
           />
         </span>
-        <span className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           <Globe className="h-4 w-4 text-gray-400" />
           {business.website ? 'Has website' : 'No website'}
-        </span>
-        {business.google_rating !== null && (
-          <span>⭐ {business.google_rating.toFixed(1)} ({business.google_review_count ?? 0})</span>
-        )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Star className="h-4 w-4 text-gray-400" />
+          {business.google_rating !== null ? (
+            <>
+              {business.google_rating.toFixed(1)} ({business.google_review_count ?? 0})
+            </>
+          ) : (
+            "No rating"
+          )}
+        </div>
+        
       </div>
 
       {/* Progress bar */}
-      <div className="mt-4">
+      <div className="mt-4 flex align-middle items-center justify-between gap-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-medium text-gray-700">Progress</span>
           <span className="tabular-nums text-gray-600">
             {score !== null ? `${Math.round(progress)}%` : '—'}
           </span>
@@ -145,27 +155,26 @@ export default function ResultCard({ business, onToggleChecked, onAnalyze }: Res
             </button>
           )}
         </div>
-        <a
-          href={contactHref}
-          target={business.website ? '_blank' : undefined}
-          rel={business.website ? 'noopener noreferrer' : undefined}
+        <Link
+          href={contactPageHref}
           className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
         >
           Contact
-        </a>
+        </Link>
       </div>
 
       {/* Mark checked (small, top-right) */}
       <button
         type="button"
         onClick={() => onToggleChecked(business.id, !business.checked)}
+        aria-label={business.checked ? 'Mark as unchecked' : 'Mark as checked'}
         className={`absolute top-4 right-4 rounded-lg px-2.5 py-1 text-xs font-medium transition ${
           business.checked
             ? 'bg-primary/20 text-gray-900'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            : ' text-gray-600 hover:bg-gray-200'
         }`}
       >
-        {business.checked ? '✓ Checked' : 'Mark checked'}
+        {business.checked ? <CheckCircle className="h-4 w-4 text-gray-400" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />}
       </button>
 
       {/* Expandable breakdown */}

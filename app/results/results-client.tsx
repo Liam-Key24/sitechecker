@@ -3,10 +3,10 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Business, ResultsFiltersState } from './types';
-import ResultsLoading from './ResultsLoading';
-import ResultsHeader from './ResultsHeader';
-import ResultsFilters from './ResultsFilters';
-import ResultsGrid from './ResultsGrid';
+import ResultsLoading from './components/ResultsLoading';
+import ResultsHeader from './components/ResultsHeader';
+import ResultsFilters from './components/ResultsFilters';
+import ResultsGrid from './components/ResultsGrid';
 
 const DEFAULT_FILTERS: ResultsFiltersState = {
   scoreMin: '',
@@ -33,77 +33,12 @@ export default function ResultsClient() {
   const pageSize = Math.max(10, parseInt(limit, 10) || 20);
   const [displayCount, setDisplayCount] = useState(pageSize);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7245/ingest/9b54c50e-7215-42b2-8f27-9665bb816f25', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      location: 'results-client.tsx:render',
-      message: 'ResultsClient render',
-      data: { loading, locationVal: location, limit, pageSize, hypothesisId: 'H4' },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   const handleAnalyze = useCallback(async (id: string, options?: { force?: boolean }) => {
     try {
-      const agentLog = async (payload: Record<string, unknown>) => {
-        try {
-          await fetch('/api/agent-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-        } catch {
-          // ignore
-        }
-      };
-
-      await agentLog({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'A',
-        location: 'app/results/results-client.tsx:handleAnalyze:entry',
-        message: 'handleAnalyze entry',
-        data: {
-          idLen: id?.length ?? null,
-          force: options?.force ?? null,
-          origin: typeof window !== 'undefined' ? window.location.origin : null,
-          path: typeof window !== 'undefined' ? window.location.pathname : null,
-          online: typeof navigator !== 'undefined' ? navigator.onLine : null,
-        },
-        timestamp: Date.now(),
-      });
-
-      const startedAt = Date.now();
-      await agentLog({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'A',
-        location: 'app/results/results-client.tsx:handleAnalyze:beforeFetch',
-        message: 'fetch /api/analyse about to start',
-        data: {
-          url: '/api/analyse',
-          bodyBytes: JSON.stringify({ businessId: id, force: options?.force }).length,
-        },
-        timestamp: Date.now(),
-      });
-
       const response = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ businessId: id, force: options?.force }),
-      });
-
-      await agentLog({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'B',
-        location: 'app/results/results-client.tsx:handleAnalyze:afterFetch',
-        message: 'fetch /api/analyse resolved',
-        data: { ok: response.ok, status: response.status, ms: Date.now() - startedAt },
-        timestamp: Date.now(),
       });
 
       const data = await response.json().catch(() => null);
@@ -129,31 +64,6 @@ export default function ResultsClient() {
         )
       );
     } catch (error) {
-      const agentLog = async (payload: Record<string, unknown>) => {
-        try {
-          await fetch('/api/agent-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-        } catch {
-          // ignore
-        }
-      };
-      await agentLog({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'C',
-        location: 'app/results/results-client.tsx:handleAnalyze:catch',
-        message: 'fetch /api/analyse threw',
-        data: {
-          errName: error instanceof Error ? error.name : typeof error,
-          errMsg: error instanceof Error ? error.message : String(error),
-          online: typeof navigator !== 'undefined' ? navigator.onLine : null,
-          visibility: typeof document !== 'undefined' ? document.visibilityState : null,
-        },
-        timestamp: Date.now(),
-      });
       console.error('Error analyzing website:', error);
       alert(
         `Error: ${error instanceof Error ? error.message : 'Failed to analyze website'}`
@@ -213,7 +123,7 @@ export default function ResultsClient() {
           ? data.businesses
           : [];
         setBusinesses(fetchedBusinesses);
-        setDisplayCount(pageSize);
+        setDisplayCount(fetchedBusinesses.length > 0 ? fetchedBusinesses.length : pageSize);
 
         if (fetchedBusinesses.length === 0) {
           console.warn('No businesses returned from API');
@@ -295,6 +205,15 @@ export default function ResultsClient() {
     });
   }, [businesses, filters]);
 
+  const handleLimitChange = useCallback(
+    (newLimit: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('limit', newLimit);
+      router.replace(`/results?${params.toString()}`);
+    },
+    [router, searchParams]
+  );
+
   const handleExportCSV = useCallback(() => {
     const filtered = getFilteredBusinesses();
     const headers = [
@@ -348,43 +267,9 @@ export default function ResultsClient() {
   const hasMore = displayCount < filteredBusinesses.length;
   const remaining = filteredBusinesses.length - displayCount;
 
-  // #region agent log
-  const effectDeps = [filters, sortBy, pageSize];
-  fetch('http://127.0.0.1:7245/ingest/9b54c50e-7215-42b2-8f27-9665bb816f25', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      location: 'results-client.tsx:effectDeps',
-      message: 'useEffect deps array before register',
-      data: {
-        loading,
-        depsLength: effectDeps.length,
-        sortBy,
-        pageSize,
-        hypothesisId: 'H1',
-        runId: 'post-fix',
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
-  // Reset display count when filters or sort change (fixed 3-element deps to satisfy React)
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/9b54c50e-7215-42b2-8f27-9665bb816f25', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'results-client.tsx:useEffect:run',
-        message: 'reset displayCount effect ran',
-        data: { pageSize, hypothesisId: 'H2', runId: 'post-fix' },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    setDisplayCount(pageSize);
-  }, [filters, sortBy, pageSize]);
+    setDisplayCount(1000);
+  }, [filters, sortBy]);
 
   if (loading) {
     return <ResultsLoading />;
@@ -396,6 +281,7 @@ export default function ResultsClient() {
         <ResultsHeader
           location={location}
           totalCount={businesses.length}
+          limit={limit}
           analyzingAll={analyzingAll}
           showFilters={showFilters}
           columnCount={columnCount}
@@ -403,6 +289,7 @@ export default function ResultsClient() {
           onBack={() => router.push('/')}
           onReloadAll={handleAnalyzeAll}
           onExportCSV={handleExportCSV}
+          onLimitChange={handleLimitChange}
           onToggleFilters={() => setShowFilters((v) => !v)}
           onColumnCountChange={setColumnCount}
           onSortChange={setSortBy}
@@ -416,6 +303,7 @@ export default function ResultsClient() {
           columnCount={columnCount}
           onToggleChecked={handleToggleChecked}
           onAnalyze={handleAnalyze}
+          resultsLocation={location || null}
         />
         {filteredBusinesses.length > 0 && (
           <div className="mt-10 flex flex-col items-center gap-2 pb-8">
@@ -423,6 +311,7 @@ export default function ResultsClient() {
               type="button"
               onClick={() => hasMore && setDisplayCount((n) => n + pageSize)}
               disabled={!hasMore}
+              aria-label={hasMore ? `Show more results (${Math.min(remaining, pageSize)} more)` : 'Showing all results'}
               className="rounded-xl border border-primary/40 bg-primary/10 px-6 py-3 text-sm font-medium text-gray-900 transition hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-primary/10"
             >
               {hasMore ? (

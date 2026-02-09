@@ -22,11 +22,17 @@ export interface GooglePlaceResult {
   };
 }
 
+/** Delay before using next_page_token (Google requires a short delay). */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function searchGooglePlaces(
   query: string,
   location?: string,
   radius?: number,
-  type?: string
+  type?: string,
+  maxResults: number = 20
 ): Promise<GooglePlaceResult[]> {
   if (!GOOGLE_PLACES_API_KEY) {
     throw new Error('GOOGLE_API_KEY is not configured');
@@ -37,43 +43,62 @@ export async function searchGooglePlaces(
   if (type && !query.toLowerCase().includes(type.toLowerCase())) {
     searchQuery = `${type} in ${query}`;
   }
-  
-  const params = new URLSearchParams({
+
+  const baseParams: Record<string, string> = {
     query: searchQuery,
     key: GOOGLE_PLACES_API_KEY,
     ...(location && { location }),
     ...(radius && { radius: radius.toString() }),
-  });
+  };
 
-  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?${params.toString()}`;
-  console.log('Google Places API URL:', url.replace(GOOGLE_PLACES_API_KEY, 'API_KEY_HIDDEN'));
+  const allResults: GooglePlaceResult[] = [];
+  let nextPageToken: string | undefined;
 
-  const response = await fetch(url);
+  do {
+    const params = new URLSearchParams(
+      nextPageToken ? { pagetoken: nextPageToken, key: GOOGLE_PLACES_API_KEY } : baseParams
+    );
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?${params.toString()}`;
+    console.log('Google Places API page request:', url.replace(GOOGLE_PLACES_API_KEY, 'API_KEY_HIDDEN'));
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Google Places API HTTP error:', response.status, errorText);
-    throw new Error(`Google Places API error: ${response.statusText}`);
-  }
+    const response = await fetch(url);
 
-  const data = await response.json();
-  console.log('Google Places API response status:', data.status);
-  
-  if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-    console.error('Google Places API error:', data.status, data.error_message);
-    if (data.status === 'REQUEST_DENIED') {
-      throw new Error(`Google Places API: Billing not enabled. Please enable billing in Google Cloud Console: ${data.error_message || ''}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Google Places API HTTP error:', response.status, errorText);
+      throw new Error(`Google Places API error: ${response.statusText}`);
     }
-    throw new Error(`Google Places API error: ${data.status} - ${data.error_message || ''}`);
-  }
 
-  if (data.status === 'ZERO_RESULTS') {
-    console.warn('Google Places API returned zero results for query:', query);
-    return [];
-  }
+    const data = await response.json();
+    console.log('Google Places API response status:', data.status);
 
-  console.log('Google Places API returned', data.results?.length || 0, 'results');
-  return data.results || [];
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      console.error('Google Places API error:', data.status, data.error_message);
+      if (data.status === 'REQUEST_DENIED') {
+        throw new Error(`Google Places API: Billing not enabled. Please enable billing in Google Cloud Console: ${data.error_message || ''}`);
+      }
+      throw new Error(`Google Places API error: ${data.status} - ${data.error_message || ''}`);
+    }
+
+    if (data.status === 'ZERO_RESULTS' && allResults.length === 0) {
+      console.warn('Google Places API returned zero results for query:', query);
+      return [];
+    }
+
+    const pageResults = data.results || [];
+    allResults.push(...pageResults);
+
+    nextPageToken = data.next_page_token;
+    if (nextPageToken && allResults.length < maxResults) {
+      await delay(2000);
+    } else {
+      nextPageToken = undefined;
+    }
+  } while (nextPageToken);
+
+  const capped = allResults.slice(0, maxResults);
+  console.log('Google Places API total returned:', capped.length, 'results (requested max', maxResults, ')');
+  return capped;
 }
 
 export async function getPlaceDetails(placeId: string): Promise<GooglePlaceResult | null> {

@@ -57,7 +57,7 @@ export default function ScoreBadge({
 
   return (
     <span className={`inline-flex items-center rounded-full font-medium ${getColor(score)} ${sizeClasses[size]}`}>
-      {score}/100 - {getLabel(score)}
+      {getLabel(score)}
     </span>
   );
 }

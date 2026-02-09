@@ -13,9 +13,12 @@ import {
 
 export type SortOption = 'default' | 'score-desc' | 'score-asc' | 'name';
 
+const LIMIT_OPTIONS = ['20', '50', '100', '200'] as const;
+
 interface ResultsHeaderProps {
   location: string;
   totalCount: number;
+  limit: string;
   analyzingAll: boolean;
   showFilters: boolean;
   columnCount: 2 | 4;
@@ -23,6 +26,7 @@ interface ResultsHeaderProps {
   onBack: () => void;
   onReloadAll: () => void;
   onExportCSV: () => void;
+  onLimitChange: (limit: string) => void;
   onToggleFilters: () => void;
   onColumnCountChange: (n: 2 | 4) => void;
   onSortChange: (s: SortOption) => void;
@@ -38,6 +42,7 @@ const SORT_LABELS: Record<SortOption, string> = {
 export default function ResultsHeader({
   location,
   totalCount,
+  limit,
   analyzingAll,
   showFilters,
   columnCount,
@@ -45,24 +50,24 @@ export default function ResultsHeader({
   onBack,
   onReloadAll,
   onExportCSV,
+  onLimitChange,
   onToggleFilters,
   onColumnCountChange,
   onSortChange,
 }: ResultsHeaderProps) {
   const [viewOpen, setViewOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [showLimitOpen, setShowLimitOpen] = useState(false);
   const viewRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
+  const showLimitRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
-      if (
-        viewRef.current && !viewRef.current.contains(e.target as Node) &&
-        sortRef.current && !sortRef.current.contains(e.target as Node)
-      ) {
-        setViewOpen(false);
-        setSortOpen(false);
-      }
+      const target = e.target as Node;
+      if (viewRef.current && !viewRef.current.contains(target)) setViewOpen(false);
+      if (sortRef.current && !sortRef.current.contains(target)) setSortOpen(false);
+      if (showLimitRef.current && !showLimitRef.current.contains(target)) setShowLimitOpen(false);
     };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
@@ -74,9 +79,10 @@ export default function ResultsHeader({
         <button
           type="button"
           onClick={onBack}
+          aria-label="Back to search"
           className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-primary/10 hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" aria-hidden />
           Back
         </button>
         <div className="flex items-center gap-2">
@@ -98,6 +104,9 @@ export default function ResultsHeader({
             <button
               type="button"
               onClick={() => { setViewOpen((o) => !o); setSortOpen(false); }}
+              aria-expanded={viewOpen}
+              aria-haspopup="listbox"
+              aria-label="View options"
               className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-primary/10 hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <span className="flex h-6 w-6 items-center justify-center rounded bg-primary/20">
@@ -122,8 +131,8 @@ export default function ResultsHeader({
           <button
             type="button"
             onClick={() => onColumnCountChange(columnCount === 2 ? 4 : 2)}
+            aria-label={columnCount === 2 ? 'Switch to 4 columns' : 'Switch to 2 columns'}
             className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-primary/10 hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
-            title={columnCount === 2 ? 'Switch to 4 columns' : 'Switch to 2 columns'}
           >
             <Columns className="h-4 w-4 text-primary" weight="duotone" />
             Column
@@ -135,24 +144,67 @@ export default function ResultsHeader({
           <button
             type="button"
             onClick={onToggleFilters}
+            aria-expanded={showFilters}
+            aria-label={showFilters ? 'Hide filters' : 'Show filters'}
             className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${
               showFilters
                 ? 'border-primary/40 bg-primary/10 text-gray-900'
                 : 'border-gray-200 bg-white text-gray-700 hover:bg-primary/10 hover:border-primary/30'
             }`}
-            title={showFilters ? 'Hide filters' : 'Show filters'}
           >
-            <Funnel className="h-4 w-4" weight="duotone" />
+            <Funnel className="h-4 w-4" weight="duotone" aria-hidden />
             Filter
           </button>
+
+          <div className="relative" ref={showLimitRef}>
+            <button
+              type="button"
+              onClick={() => { setShowLimitOpen((o) => !o); setSortOpen(false); setViewOpen(false); }}
+              aria-expanded={showLimitOpen}
+              aria-haspopup="listbox"
+              aria-label={`Show ${limit} results per page; change limit`}
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-primary/10 hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              Show
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold text-primary">
+                {limit}
+              </span>
+              <CaretDown className="h-4 w-4 text-gray-400" />
+            </button>
+            {showLimitOpen && (
+              <div
+                role="listbox"
+                aria-label="Results per page"
+                className="absolute left-0 top-full z-10 mt-1 min-w-[100px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+              >
+                {LIMIT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    role="option"
+                    aria-selected={limit === opt}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-primary/10 ${
+                      limit === opt ? 'bg-primary/10 font-medium text-gray-900' : 'text-gray-700'
+                    }`}
+                    onClick={() => { onLimitChange(opt); setShowLimitOpen(false); }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="relative" ref={sortRef}>
             <button
               type="button"
               onClick={() => { setSortOpen((o) => !o); setViewOpen(false); }}
+              aria-expanded={sortOpen}
+              aria-haspopup="listbox"
+              aria-label={`Sort by ${SORT_LABELS[sortBy]}`}
               className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-primary/10 hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              <SortAscending className="h-4 w-4 text-gray-500" weight="duotone" />
+              <SortAscending className="h-4 w-4 text-gray-500" weight="duotone" aria-hidden />
               Sort
               <CaretDown className="h-4 w-4 text-gray-400" />
             </button>
@@ -181,6 +233,8 @@ export default function ResultsHeader({
           type="button"
           onClick={onReloadAll}
           disabled={analyzingAll}
+          aria-busy={analyzingAll}
+          aria-label={analyzingAll ? 'Reloading all analyses' : 'Reload all analyses'}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-gray-900 transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {analyzingAll ? 'Reloading...' : 'Reload All'}
@@ -188,6 +242,7 @@ export default function ResultsHeader({
         <button
           type="button"
           onClick={onExportCSV}
+          aria-label="Export results to CSV"
           className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-gray-900 transition hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           Export CSV

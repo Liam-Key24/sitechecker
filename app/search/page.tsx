@@ -1,4 +1,4 @@
-import SearchFormSection from "../landingpagecomponents /SearchFormSection";
+import SearchFormSection from '@/app/landing/SearchFormSection';
 
 
 export default function SearchPage() {

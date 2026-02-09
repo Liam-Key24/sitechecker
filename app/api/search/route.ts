@@ -32,8 +32,14 @@ export async function GET(request: NextRequest) {
       if (keywords) query = `${keywords} ${query}`;
     }
 
-    console.log('Searching Google Places with query:', query);
-    const places = await searchGooglePlaces(query, undefined, undefined, category || undefined);
+    console.log('Searching Google Places with query:', query, 'limit:', limit);
+    const places = await searchGooglePlaces(
+      query,
+      undefined,
+      undefined,
+      category || undefined,
+      limit
+    );
     console.log('Google Places returned:', places.length, 'results');
 
     if (places.length === 0) {

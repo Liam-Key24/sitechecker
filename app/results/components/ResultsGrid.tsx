@@ -1,7 +1,7 @@
 'use client';
 
 import ResultCard from '@/components/ResultCard';
-import type { Business } from './types';
+import type { Business } from '../types';
 
 interface ResultsGridProps {
   businesses: Business[];
@@ -9,6 +9,7 @@ interface ResultsGridProps {
   columnCount: 2 | 4;
   onToggleChecked: (id: string, checked: boolean) => void;
   onAnalyze: (id: string, options?: { force?: boolean }) => Promise<void>;
+  resultsLocation?: string | null;
 }
 
 export default function ResultsGrid({
@@ -17,6 +18,7 @@ export default function ResultsGrid({
   columnCount,
   onToggleChecked,
   onAnalyze,
+  resultsLocation,
 }: ResultsGridProps) {
   const isMasonry = columnCount === 4;
   return (
@@ -42,18 +44,20 @@ export default function ResultsGrid({
                 business={business}
                 onToggleChecked={onToggleChecked}
                 onAnalyze={(id) => onAnalyze(id)}
+                resultsLocation={resultsLocation}
               />
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 grid-rows-[auto] items-start gap-6 md:grid-cols-2">
           {businesses.map((business) => (
             <ResultCard
               key={business.id}
               business={business}
               onToggleChecked={onToggleChecked}
               onAnalyze={(id) => onAnalyze(id)}
+              resultsLocation={resultsLocation}
             />
           ))}
         </div>

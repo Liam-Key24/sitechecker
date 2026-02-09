@@ -1,7 +1,49 @@
 'use client';
 
 import { useState } from 'react';
+import { Monitor, DeviceMobile, Globe, CaretDown, CaretUp } from 'phosphor-react';
 import type { AnalysisBreakdown } from '@/lib/contracts';
+
+const SEGMENTS = 10;
+
+function ScoreCard({
+  icon: Icon,
+  title,
+  score,
+  subtext,
+}: {
+  icon: React.ElementType;
+  title: string;
+  score: number;
+  subtext?: string;
+}) {
+  const clamped = Math.min(100, Math.max(0, Math.round(score)));
+  const filled = Math.round((clamped / 100) * SEGMENTS);
+  return (
+    <div className="rounded-xl border border-gray-200/80 bg-gray-50/80 p-4 shadow-sm">
+      <div className="flex items-center gap-2 text-gray-600">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+          <Icon className="h-5 w-5" weight="duotone" />
+        </div>
+        <span className="text-sm font-medium">{title}</span>
+      </div>
+      <p className="mt-3 text-2xl font-bold tabular-nums text-gray-900">{clamped}</p>
+      {subtext && (
+        <p className="mt-0.5 text-xs text-gray-500">{subtext}</p>
+      )}
+      <div className="mt-3 flex gap-0.5" aria-hidden>
+        {Array.from({ length: SEGMENTS }, (_, i) => (
+          <div
+            key={i}
+            className={`h-1.5 flex-1 rounded-sm transition-colors ${
+              i < filled ? 'bg-primary' : 'bg-gray-200'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface BreakdownProps {
   data: AnalysisBreakdown;
@@ -13,195 +55,95 @@ export default function Breakdown({ data, initialOpen = false }: BreakdownProps)
   const weaknessNotes = data.weakness_notes ?? [];
   const noWebsite = weaknessNotes.includes('No website found');
 
-  const hasAnyData =
-    data.pagespeed_score !== null ||
-    data.foursquare_score !== null ||
-    Boolean(data.pagespeed) ||
-    Boolean(data.website) ||
-    Boolean(data.foursquare);
+  const desktopScore =
+    data.pagespeed?.desktopPerformance !== undefined &&
+    typeof data.pagespeed.desktopPerformance === 'number'
+      ? data.pagespeed.desktopPerformance
+      : null;
+  const mobileScore =
+    data.pagespeed?.performance !== undefined && typeof data.pagespeed.performance === 'number'
+      ? data.pagespeed.performance
+      : data.pagespeed_score !== null
+        ? data.pagespeed_score
+        : null;
 
-  if (!hasAnyData) {
+  const hasDesktop = desktopScore !== null;
+  const hasMobile = mobileScore !== null;
+  const hasWebStandards =
+    typeof data.web_standards_score === 'number' && data.web_standards_score !== null;
+  const hasWeaknesses = weaknessNotes.length > 0;
+  const hasAnyScore = hasDesktop || hasMobile || hasWebStandards;
+
+  if (!hasAnyScore && !hasWeaknesses && noWebsite) {
     return null;
   }
 
   return (
     <div className="mt-2">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+        className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-primary transition-colors duration-200"
       >
-        {isOpen ? 'Hide' : 'Show'} Score Breakdown
+        {isOpen ? <CaretUp className="h-4 w-4" /> : <CaretDown className="h-4 w-4" />}
+        {isOpen ? 'Hide' : 'Show'} score breakdown
       </button>
 
-      {isOpen && (
-        <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
-          {typeof data.web_standards_score === 'number' && (
-            <div className="pb-2 border-b border-gray-200">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-900">Website Standards</span>
-                <span className="font-semibold text-gray-900 tabular-nums">
-                  {Math.round(data.web_standards_score)}/100
-                </span>
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-out"
+        style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="mt-3 space-y-4">
+            {(hasDesktop || hasMobile || hasWebStandards) && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {hasDesktop && (
+                  <ScoreCard
+                    icon={Monitor}
+                    title="Web desktop"
+                    score={desktopScore!}
+                    subtext="Performance score"
+                  />
+                )}
+                {hasMobile && (
+                  <ScoreCard
+                    icon={DeviceMobile}
+                    title="Mobile"
+                    score={mobileScore!}
+                    subtext="Performance score"
+                  />
+                )}
+                {hasWebStandards && (
+                  <ScoreCard
+                    icon={Globe}
+                    title="Web standards"
+                    score={data.web_standards_score as number}
+                    subtext="On-page checks"
+                  />
+                )}
               </div>
-              <div className="mt-2 h-2 w-full rounded-full bg-gray-200 overflow-hidden">
-                <div
-                  className={
-                    data.web_standards_score <= 30
-                      ? 'h-full bg-red-500'
-                      : data.web_standards_score <= 60
-                        ? 'h-full bg-yellow-500'
-                        : data.web_standards_score <= 80
-                          ? 'h-full bg-blue-500'
-                          : 'h-full bg-primary'
-                  }
-                  style={{ width: `${Math.min(100, Math.max(0, data.web_standards_score))}%` }}
-                />
-              </div>
-              <div className="mt-1 text-xs text-gray-600">
-                Based on Lighthouse categories (when available) + on-page standards checks.
-              </div>
-            </div>
-          )}
+            )}
 
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <span className="text-gray-600">PageSpeed (mobile perf):</span>
-              <span className="ml-2 font-medium">
-                {data.pagespeed_score !== null
-                  ? `${data.pagespeed_score}/100`
-                  : noWebsite
-                    ? 'No website'
-                    : 'N/A'}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-600">Foursquare authority:</span>
-              <span className="ml-2 font-medium">
-                {data.foursquare_score !== null ? `${data.foursquare_score}/100` : 'N/A'}
-              </span>
-            </div>
+            {hasWeaknesses && (
+              <div className="rounded-xl border border-gray-200/80 bg-gray-50/80 p-4">
+                <p className="text-sm font-medium text-gray-700">Weaknesses</p>
+                <ul className="mt-2 space-y-1 text-sm text-gray-600">
+                  {weaknessNotes.map((note, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {noWebsite && !hasAnyScore && (
+              <p className="text-sm text-gray-500">No website — scores not available.</p>
+            )}
           </div>
-
-          {data.pagespeed ? (
-            <div className="pt-2 border-t border-gray-200">
-              <p className="text-sm font-medium text-gray-700 mb-1">PageSpeed details</p>
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-                <div>Mobile perf: {data.pagespeed.performance}/100</div>
-                <div>
-                  Desktop perf:{' '}
-                  {data.pagespeed.desktopPerformance !== undefined
-                    ? `${data.pagespeed.desktopPerformance}/100`
-                    : 'N/A'}
-                </div>
-                <div>
-                  Accessibility:{' '}
-                  {data.pagespeed.accessibility !== undefined
-                    ? `${data.pagespeed.accessibility}/100`
-                    : 'N/A'}
-                </div>
-                <div>
-                  SEO:{' '}
-                  {data.pagespeed.seo !== undefined ? `${data.pagespeed.seo}/100` : 'N/A'}
-                </div>
-                <div>
-                  Best practices:{' '}
-                  {data.pagespeed.bestPractices !== undefined
-                    ? `${data.pagespeed.bestPractices}/100`
-                    : 'N/A'}
-                </div>
-                <div>Mobile-friendly: {data.pagespeed.mobileFriendly ? 'Yes' : 'No'}</div>
-                <div>
-                  LCP:{' '}
-                  {data.pagespeed.coreWebVitals?.lcp !== undefined
-                    ? `${Math.round(data.pagespeed.coreWebVitals.lcp)}ms`
-                    : 'N/A'}
-                </div>
-                <div>
-                  CLS:{' '}
-                  {data.pagespeed.coreWebVitals?.cls !== undefined
-                    ? data.pagespeed.coreWebVitals.cls
-                    : 'N/A'}
-                </div>
-                <div>
-                  INP:{' '}
-                  {data.pagespeed.coreWebVitals?.inp !== undefined
-                    ? `${Math.round(data.pagespeed.coreWebVitals.inp)}ms`
-                    : 'N/A'}
-                </div>
-              </div>
-            </div>
-          ) : !noWebsite && data.website ? (
-            <div className="pt-2 border-t border-gray-200 text-sm text-gray-700">
-              PageSpeed data is unavailable. Usually this means `GOOGLE_API_KEY` isn’t set, the
-              key has no access to the PageSpeed API, or you hit quota.
-            </div>
-          ) : null}
-
-          {data.website && (
-            <div className="pt-2 border-t border-gray-200">
-              <p className="text-sm font-medium text-gray-700 mb-1">Website checks</p>
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-                <div>HTTPS: {data.website.hasHttps ? 'Yes' : 'No'}</div>
-                <div>Title: {data.website.hasTitle ? 'Yes' : 'No'}</div>
-                <div>Meta description: {data.website.hasMetaDescription ? 'Yes' : 'No'}</div>
-                <div>H1: {data.website.hasH1 ? 'Yes' : 'No'}</div>
-                <div>Schema: {data.website.hasSchema ? 'Yes' : 'No'}</div>
-                <div>
-                  LocalBusiness schema: {data.website.hasLocalBusinessSchema ? 'Yes' : 'No'}
-                </div>
-                <div>CTA text: {data.website.hasCTA ? 'Yes' : 'No'}</div>
-                <div>Contact option: {data.website.hasContactForm ? 'Yes' : 'No'}</div>
-                <div>Reviews/testimonials: {data.website.hasReviews ? 'Yes' : 'No'}</div>
-              </div>
-            </div>
-          )}
-
-          {data.foursquare && (
-            <div className="pt-2 border-t border-gray-200">
-              <p className="text-sm font-medium text-gray-700 mb-1">Foursquare details</p>
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-                <div>
-                  Rating:{' '}
-                  {typeof data.foursquare.rating === 'number'
-                    ? `${data.foursquare.rating.toFixed(1)}/10`
-                    : 'N/A'}
-                </div>
-                <div>
-                  Popularity:{' '}
-                  {typeof data.foursquare.popularity === 'number'
-                    ? data.foursquare.popularity
-                    : 'N/A'}
-                </div>
-                <div>
-                  Match confidence:{' '}
-                  {typeof data.foursquare.match_confidence === 'number'
-                    ? data.foursquare.match_confidence.toFixed(2)
-                    : 'N/A'}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {data.final_score !== null && (
-            <div className="pt-2 border-t border-gray-200">
-              <span className="text-sm text-gray-600">Final Score (Median):</span>
-              <span className="ml-2 font-semibold text-lg">{data.final_score}/100</span>
-            </div>
-          )}
-
-          {weaknessNotes.length > 0 && (
-            <div className="pt-2 border-t border-gray-200">
-              <p className="text-sm font-medium text-gray-700 mb-1">Weaknesses:</p>
-              <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                {weaknessNotes.map((note, idx) => (
-                  <li key={idx}>{note}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
-
