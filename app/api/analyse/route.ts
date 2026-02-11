@@ -6,25 +6,6 @@ import { calculateOpportunityScore } from '@/lib/scorer';
 import { getFoursquarePlaceDetails, searchFoursquare } from '@/lib/foursquare';
 import type { AnalysisBreakdown, WebsiteAnalysis } from '@/lib/contracts';
 
-const AGENT_LOG_ENDPOINT =
-  'http://127.0.0.1:7245/ingest/9b54c50e-7215-42b2-8f27-9665bb816f25';
-
-async function agentLog(payload: Record<string, unknown>) {
-  try {
-    await fetch(AGENT_LOG_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    // ignore
-  }
-}
-
-// #region agent log (D)
-agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'app/api/analyse/route.ts:module',message:'route module loaded',data:{},timestamp:Date.now()});
-// #endregion
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -52,38 +33,11 @@ function getGoogleLatLng(raw: unknown): { lat: number; lng: number } | null {
 }
 
 export async function POST(request: NextRequest) {
-  const startedAt = Date.now();
   try {
-    // #region agent log (H)
-    request.signal.addEventListener(
-      'abort',
-      () => {
-        agentLog({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
-          hypothesisId: 'H',
-          location: 'app/api/analyse/route.ts:POST:abort',
-          message: 'request.signal aborted',
-          data: { ms: Date.now() - startedAt },
-          timestamp: Date.now(),
-        });
-      },
-      { once: true }
-    );
-    // #endregion
-
-    // #region agent log (D)
-    await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'app/api/analyse/route.ts:POST:entry',message:'POST /api/analyse entry',data:{method:request.method,url:request.url,contentType:request.headers.get('content-type')},timestamp:Date.now()});
-    // #endregion
-
     const body: unknown = await request.json();
     const businessId =
       isRecord(body) && typeof body.businessId === 'string' ? body.businessId : undefined;
     const force = isRecord(body) && typeof body.force === 'boolean' ? body.force : undefined;
-
-    // #region agent log (E)
-    await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'app/api/analyse/route.ts:POST:body',message:'parsed request.json()',data:{hasBusinessId:typeof businessId==='string' && businessId.length>0,force:force ?? null},timestamp:Date.now()});
-    // #endregion
 
     if (!businessId) {
       return NextResponse.json({ error: 'businessId is required' }, { status: 400 });
@@ -97,14 +51,6 @@ export async function POST(request: NextRequest) {
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 });
     }
-
-    // #region agent log (E)
-    await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'app/api/analyse/route.ts:POST:business',message:'loaded business from db',data:{hasWebsite:!!business.website,hasFinalScore:business.final_score!==null},timestamp:Date.now()});
-    // #endregion
-
-    // #region agent log (G)
-    await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'G',location:'app/api/analyse/route.ts:POST:beforeAnalysis',message:'starting analysis work',data:{hasWebsite:!!business.website},timestamp:Date.now()});
-    // #endregion
 
     // Check if we have a recent analysis (within 7 days)
     const recentAnalysis = await db.analysis.findFirst({
@@ -189,7 +135,7 @@ export async function POST(request: NextRequest) {
             // Basic token overlap similarity (0-1) for a rough confidence.
             const n1 = business.name.toLowerCase().split(/\s+/);
             const n2 = match.name.toLowerCase().split(/\s+/);
-            const common = n1.filter((t) => n2.includes(t));
+            const common = n1.filter((t: string) => n2.includes(t));
             foursquareMatchConfidence = common.length / Math.max(n1.length, n2.length);
 
             const details = await getFoursquarePlaceDetails(match.fsq_id);
@@ -286,27 +232,12 @@ export async function POST(request: NextRequest) {
       breakdown: scoreBreakdown,
     });
   } catch (error: unknown) {
-    // #region agent log (F)
-    await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'F',location:'app/api/analyse/route.ts:POST:catch',message:'POST /api/analyse threw',data:{errName:error instanceof Error?error.name:typeof error,errMsg:error instanceof Error?error.message:String(error)},timestamp:Date.now()});
-    // #endregion
     console.error('Analysis error:', error);
     const message = error instanceof Error ? error.message : 'Failed to analyze website';
     return NextResponse.json(
       { error: message },
       { status: 500 }
     );
-  } finally {
-    // #region agent log (I)
-    await agentLog({
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
-      hypothesisId: 'I',
-      location: 'app/api/analyse/route.ts:POST:finally',
-      message: 'POST /api/analyse finished',
-      data: { aborted: request.signal.aborted, ms: Date.now() - startedAt },
-      timestamp: Date.now(),
-    });
-    // #endregion
   }
 }
 

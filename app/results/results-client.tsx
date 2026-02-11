@@ -1,25 +1,19 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import ResultCard from '@/components/ResultCard';
-import type { AnalysisBreakdown } from '@/lib/contracts';
+import type { Business, ResultsFiltersState } from './types';
+import ResultsLoading from './components/ResultsLoading';
+import ResultsHeader from './components/ResultsHeader';
+import ResultsFilters from './components/ResultsFilters';
+import ResultsGrid from './components/ResultsGrid';
 
-interface Business {
-  id: string;
-  place_id: string;
-  name: string;
-  website: string | null;
-  address: string | null;
-  phone: string | null;
-  categories: string[];
-  google_rating: number | null;
-  google_review_count: number | null;
-  foursquare_rating: number | null;
-  final_score: number | null;
-  checked: boolean;
-  breakdown?: AnalysisBreakdown | null;
-}
+const DEFAULT_FILTERS: ResultsFiltersState = {
+  scoreMin: '',
+  scoreMax: '',
+  hasWebsite: 'all',
+  checked: 'all',
+};
 
 export default function ResultsClient() {
   const searchParams = useSearchParams();
@@ -27,50 +21,25 @@ export default function ResultsClient() {
   const [loading, setLoading] = useState(true);
   const [analyzingAll, setAnalyzingAll] = useState(false);
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [filters, setFilters] = useState({
-    scoreMin: '',
-    scoreMax: '',
-    hasWebsite: 'all',
-    checked: 'all',
-  });
+  const [filters, setFilters] = useState<ResultsFiltersState>(DEFAULT_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+  const [columnCount, setColumnCount] = useState<2 | 4>(2);
+  const [sortBy, setSortBy] = useState<'default' | 'score-desc' | 'score-asc' | 'name'>('default');
 
   const location = searchParams.get('location') || '';
   const category = searchParams.get('category') || '';
   const keywords = searchParams.get('keywords') || '';
   const limit = searchParams.get('limit') || '20';
+  const pageSize = Math.max(10, parseInt(limit, 10) || 20);
+  const [displayCount, setDisplayCount] = useState(pageSize);
 
   const handleAnalyze = useCallback(async (id: string, options?: { force?: boolean }) => {
     try {
-      const agentLog = async (payload: Record<string, unknown>) => {
-        try {
-          await fetch('/api/agent-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-        } catch {
-          // ignore
-        }
-      };
-
-      // #region agent log (A)
-      await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'app/results/results-client.tsx:handleAnalyze:entry',message:'handleAnalyze entry',data:{idLen:id?.length ?? null,force:options?.force ?? null,origin:typeof window!=='undefined'?window.location.origin:null,path:typeof window!=='undefined'?window.location.pathname:null,online:typeof navigator!=='undefined'?navigator.onLine:null},timestamp:Date.now()});
-      // #endregion
-
-      const startedAt = Date.now();
-      // #region agent log (A)
-      await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'app/results/results-client.tsx:handleAnalyze:beforeFetch',message:'fetch /api/analyse about to start',data:{url:'/api/analyse',bodyBytes:JSON.stringify({businessId:id,force:options?.force}).length},timestamp:Date.now()});
-      // #endregion
-
       const response = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ businessId: id, force: options?.force }),
       });
-
-      // #region agent log (B)
-      await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B',location:'app/results/results-client.tsx:handleAnalyze:afterFetch',message:'fetch /api/analyse resolved',data:{ok:response.ok,status:response.status,ms:Date.now()-startedAt},timestamp:Date.now()});
-      // #endregion
 
       const data = await response.json().catch(() => null);
 
@@ -95,21 +64,6 @@ export default function ResultsClient() {
         )
       );
     } catch (error) {
-      const agentLog = async (payload: Record<string, unknown>) => {
-        try {
-          await fetch('/api/agent-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-        } catch {
-          // ignore
-        }
-      };
-
-      // #region agent log (C)
-      await agentLog({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'app/results/results-client.tsx:handleAnalyze:catch',message:'fetch /api/analyse threw',data:{errName:error instanceof Error?error.name:typeof error,errMsg:error instanceof Error?error.message:String(error),online:typeof navigator!=='undefined'?navigator.onLine:null,visibility:typeof document!=='undefined'?document.visibilityState:null},timestamp:Date.now()});
-      // #endregion
       console.error('Error analyzing website:', error);
       alert(
         `Error: ${error instanceof Error ? error.message : 'Failed to analyze website'}`
@@ -120,7 +74,6 @@ export default function ResultsClient() {
   const needsAnalysis = useCallback((b: Business) => {
     if (b.final_score === null) return true;
     if (!b.breakdown) return true;
-    // If this is an older breakdown without richer fields, refresh it.
     if (
       b.breakdown.pagespeed === undefined ||
       b.breakdown.website === undefined ||
@@ -141,42 +94,50 @@ export default function ResultsClient() {
           ...(category && { category }),
           ...(keywords && { keywords }),
         });
+        const url = `/api/search?${params.toString()}`;
+        const response = await fetch(url);
+        const bodyText = await response.text();
 
-        const response = await fetch(`/api/search?${params.toString()}`);
-        const data = await response.json();
+        let data: { businesses?: Business[]; error?: string };
+        try {
+          data = JSON.parse(bodyText) as { businesses?: Business[]; error?: string };
+        } catch {
+          const msg =
+            response.status >= 500
+              ? 'Server error. Please try again later.'
+              : 'Something went wrong. Please try again.';
+          alert(msg);
+          setBusinesses([]);
+          setLoading(false);
+          return;
+        }
 
         if (!response.ok) {
           console.error('API Error:', data);
-          alert(`Error: ${data.error || 'Failed to fetch results'}`);
+          alert(`Error: ${data.error ?? 'Failed to fetch results'}`);
           setBusinesses([]);
           return;
         }
 
-        const fetchedBusinesses = data.businesses || [];
+        const fetchedBusinesses: Business[] = Array.isArray(data.businesses)
+          ? data.businesses
+          : [];
         setBusinesses(fetchedBusinesses);
+        setDisplayCount(fetchedBusinesses.length > 0 ? fetchedBusinesses.length : pageSize);
 
-        if (!fetchedBusinesses || fetchedBusinesses.length === 0) {
+        if (fetchedBusinesses.length === 0) {
           console.warn('No businesses returned from API');
         } else {
-          // Auto-analyze any businesses missing a complete analysis (run after state is set)
-          const toAnalyze = fetchedBusinesses.filter((b: Business) => needsAnalysis(b));
+          const toAnalyze = fetchedBusinesses.filter((b) => needsAnalysis(b));
           if (toAnalyze.length > 0) {
-            console.log(
-              `Auto-analyzing ${toAnalyze.length} businesses missing analysis...`
-            );
-
-            // Analyze in sequence with delay to avoid rate limiting
+            console.log(`Auto-analyzing ${toAnalyze.length} businesses missing analysis...`);
             (async () => {
               for (const business of toAnalyze) {
                 try {
                   await handleAnalyze(business.id);
-                  // Small delay between analyses
                   await new Promise((resolve) => setTimeout(resolve, 1500));
                 } catch (error) {
-                  console.error(
-                    `Error auto-analyzing business ${business.id}:`,
-                    error
-                  );
+                  console.error(`Error auto-analyzing business ${business.id}:`, error);
                 }
               }
             })();
@@ -205,7 +166,6 @@ export default function ResultsClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ businessId: id, checked }),
       });
-
       if (response.ok) {
         setBusinesses((prev) =>
           prev.map((b) => (b.id === id ? { ...b, checked } : b))
@@ -216,19 +176,16 @@ export default function ResultsClient() {
     }
   }, []);
 
-  const handleAnalyzeAll = async () => {
+  const handleAnalyzeAll = useCallback(async () => {
     setAnalyzingAll(true);
-    const toAnalyze = businesses;
-
-    for (const business of toAnalyze) {
+    for (const business of businesses) {
       await handleAnalyze(business.id, { force: true });
-      // Small delay to avoid rate limiting
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
     setAnalyzingAll(false);
-  };
+  }, [businesses, handleAnalyze]);
 
-  const getFilteredBusinesses = () => {
+  const getFilteredBusinesses = useCallback(() => {
     return businesses.filter((b) => {
       if (filters.hasWebsite === 'yes' && !b.website) return false;
       if (filters.hasWebsite === 'no' && b.website) return false;
@@ -236,19 +193,28 @@ export default function ResultsClient() {
       if (filters.checked === 'unchecked' && b.checked) return false;
       if (
         filters.scoreMin &&
-        (b.final_score === null || b.final_score < parseInt(filters.scoreMin))
+        (b.final_score === null || b.final_score < parseInt(filters.scoreMin, 10))
       )
         return false;
       if (
         filters.scoreMax &&
-        (b.final_score === null || b.final_score > parseInt(filters.scoreMax))
+        (b.final_score === null || b.final_score > parseInt(filters.scoreMax, 10))
       )
         return false;
       return true;
     });
-  };
+  }, [businesses, filters]);
 
-  const handleExportCSV = () => {
+  const handleLimitChange = useCallback(
+    (newLimit: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('limit', newLimit);
+      router.replace(`/results?${params.toString()}`);
+    },
+    [router, searchParams]
+  );
+
+  const handleExportCSV = useCallback(() => {
     const filtered = getFilteredBusinesses();
     const headers = [
       'Name',
@@ -268,7 +234,6 @@ export default function ResultsClient() {
       b.final_score !== null ? b.final_score.toString() : 'Not analyzed',
       b.breakdown?.weakness_notes?.join('; ') || '',
     ]);
-
     const csv = [headers, ...rows]
       .map((row) => row.map((cell) => `"${cell}"`).join(','))
       .join('\n');
@@ -279,144 +244,90 @@ export default function ResultsClient() {
     a.download = `opportunities-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [getFilteredBusinesses]);
 
-  const filteredBusinesses = getFilteredBusinesses();
+  const filteredBusinesses = useMemo(() => {
+    const list = getFilteredBusinesses();
+    if (sortBy === 'default') return list;
+    const sorted = [...list];
+    if (sortBy === 'score-desc') {
+      sorted.sort((a, b) => (b.final_score ?? -1) - (a.final_score ?? -1));
+    } else if (sortBy === 'score-asc') {
+      sorted.sort((a, b) => (a.final_score ?? -1) - (b.final_score ?? -1));
+    } else if (sortBy === 'name') {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return sorted;
+  }, [getFilteredBusinesses, sortBy]);
+
+  const visibleBusinesses = useMemo(
+    () => filteredBusinesses.slice(0, displayCount),
+    [filteredBusinesses, displayCount]
+  );
+  const hasMore = displayCount < filteredBusinesses.length;
+  const remaining = filteredBusinesses.length - displayCount;
+
+  useEffect(() => {
+    setDisplayCount(1000);
+  }, [filters, sortBy]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Searching businesses...</p>
-        </div>
-      </div>
-    );
+    return <ResultsLoading />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
+        <ResultsHeader
+          location={location}
+          totalCount={businesses.length}
+          limit={limit}
+          analyzingAll={analyzingAll}
+          showFilters={showFilters}
+          columnCount={columnCount}
+          sortBy={sortBy}
+          onBack={() => router.push('/')}
+          onReloadAll={handleAnalyzeAll}
+          onExportCSV={handleExportCSV}
+          onLimitChange={handleLimitChange}
+          onToggleFilters={() => setShowFilters((v) => !v)}
+          onColumnCountChange={setColumnCount}
+          onSortChange={setSortBy}
+        />
+        {showFilters && (
+          <ResultsFilters filters={filters} onChange={setFilters} />
+        )}
+        <ResultsGrid
+          businesses={visibleBusinesses}
+          totalCount={filteredBusinesses.length}
+          columnCount={columnCount}
+          onToggleChecked={handleToggleChecked}
+          onAnalyze={handleAnalyze}
+          resultsLocation={location || null}
+        />
+        {filteredBusinesses.length > 0 && (
+          <div className="mt-10 flex flex-col items-center gap-2 pb-8">
             <button
-              onClick={() => router.push('/')}
-              className="text-blue-600 hover:text-blue-800 font-medium mb-2"
+              type="button"
+              onClick={() => hasMore && setDisplayCount((n) => n + pageSize)}
+              disabled={!hasMore}
+              aria-label={hasMore ? `Show more results (${Math.min(remaining, pageSize)} more)` : 'Showing all results'}
+              className="rounded-xl border border-primary/40 bg-primary/10 px-6 py-3 text-sm font-medium text-gray-900 transition hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-primary/10"
             >
-              ← Back to Search
-            </button>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Results for: {location}
-            </h1>
-            <p className="text-gray-600 mt-1">Found {businesses.length} businesses</p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleAnalyzeAll}
-              disabled={analyzingAll}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {analyzingAll ? 'Reloading...' : 'Reload Analysis (All)'}
-            </button>
-            <button
-              onClick={handleExportCSV}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              Export CSV
+              {hasMore ? (
+                <>
+                  Show more results
+                  <span className="ml-2 text-primary">
+                    (+{Math.min(remaining, pageSize)})
+                  </span>
+                </>
+              ) : (
+                <>Showing all {filteredBusinesses.length} results</>
+              )}
             </button>
           </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-3">Filters</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Score Min
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={filters.scoreMin}
-                onChange={(e) =>
-                  setFilters({ ...filters, scoreMin: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Score Max
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={filters.scoreMax}
-                onChange={(e) =>
-                  setFilters({ ...filters, scoreMax: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="100"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Has Website
-              </label>
-              <select
-                value={filters.hasWebsite}
-                onChange={(e) =>
-                  setFilters({ ...filters, hasWebsite: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="all">All</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Checked Status
-              </label>
-              <select
-                value={filters.checked}
-                onChange={(e) => setFilters({ ...filters, checked: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="all">All</option>
-                <option value="checked">Checked</option>
-                <option value="unchecked">Unchecked</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4 text-sm text-gray-600">
-          Showing {filteredBusinesses.length} of {businesses.length} businesses
-        </div>
-
-        <div className="grid grid-cols-1 gap-6">
-          {filteredBusinesses.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-8 text-center text-gray-600">
-              No businesses match your filters.
-            </div>
-          ) : (
-            filteredBusinesses.map((business) => (
-              <ResultCard
-                key={business.id}
-                business={business}
-                onToggleChecked={handleToggleChecked}
-                onAnalyze={handleAnalyze}
-              />
-            ))
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
 }
-

@@ -1,15 +1,19 @@
-import SearchForm from '@/components/SearchForm';
-import Hero from '@/app/landingpagecomponents /Hero';
+import Hero from '@/app/landing/Hero';
+import HowItWorksSection from '@/app/landing/HowItWorks';
+import WhyItMattersSection from '@/app/landing/WhyItMatters';
+import MissionSection from '@/app/landing/MissionSection';
+import WhoItsForSection from '@/app/landing/WhoItsFor';
+import EthicalNoteSection from '@/app/landing/EthicalNote';
+
 export default function Home() {
   return (
-    <div className="">
+    <main className="">
       <Hero />
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-3xl mx-auto">
-          
-          <SearchForm />
-        </div>
-      </div>
-    </div>
+      <WhyItMattersSection />
+      <MissionSection />
+      <HowItWorksSection />
+      <WhoItsForSection />
+      <EthicalNoteSection />
+    </main>
   );
 }

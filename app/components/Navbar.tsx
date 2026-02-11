@@ -1,37 +1,51 @@
  "use client";
 
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 const navLinks = [
-  { label: "App", href: "#" },
+  { label: "Search", href: "/search" },
   { label: "Contact me", href: "#" },
 ] as const;
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const menuId = useId();
 
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 0);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
+    <header className="fixed inset-x-0 top-0 z-50 h-0">
       <nav
         aria-label="Primary"
-        className="mx-auto w-[min(80rem,calc(100%-2rem))] rounded-2xl border border-white/15 bg-white/10 px-4 py-3 shadow-lg shadow-black/5 backdrop-blur-xl dark:bg-white/5 absolute top-5 z-50 left-0 right-0"
+        className={[
+          "absolute left-0 right-0 top-6 mx-auto w-[min(80rem,calc(100%-2rem))] rounded-2xl border px-4 py-3 shadow-lg shadow-black/5 transition-[background-color,border-color,backdrop-filter] duration-300 ease-out",
+          isScrolled
+            ? "border-white/15 bg-white/10 backdrop-blur-xl dark:bg-white/5"
+            : "border-black/10 bg-white",
+        ].join(" ")}
       >
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Link
-              href="#"
-              className="text-lg font-semibold tracking-tight text-foreground"
-            >
+              href="/"
+              className="text-lg font-semibold tracking-tight text-black"
+              >
               FreshLeaf
             </Link>
 
             <div className="hidden items-center gap-4 sm:flex">
               {navLinks.map((link) => (
                 <Link
-                  key={link.label}
-                  href={link.href}
-                  className="text-sm text-foreground/80 transition hover:text-foreground"
+                key={link.label}
+                href={link.href}
+                className="text-sm text-black transition hover:text-black/80"
                 >
                   {link.label}
                 </Link>
@@ -42,14 +56,14 @@ export function Navbar() {
           <div className="hidden items-center gap-2 sm:flex">
             <Link
               href="#"
-              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-foreground/90 transition hover:bg-white/15 hover:text-foreground"
-            >
+              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-black transition hover:bg-black/10 hover:text-black"
+              >
               Account
             </Link>
             <Link
               href="#"
-              className="inline-flex items-center justify-center rounded-xl bg-foreground px-3 py-2 text-sm font-medium text-background transition hover:opacity-90"
-            >
+              className="inline-flex items-center justify-center rounded-xl bg-foreground px-3 py-2 text-sm font-medium text-black transition hover:opacity-90"
+              >
               Log in
             </Link>
           </div>
@@ -60,8 +74,8 @@ export function Navbar() {
             aria-expanded={isOpen}
             aria-controls={menuId}
             onClick={() => setIsOpen((v) => !v)}
-            className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 p-2 text-foreground/90 transition hover:bg-white/15 hover:text-foreground sm:hidden"
-          >
+            className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 p-2 text-black transition hover:bg-black/10 hover:text-black sm:hidden"
+            >
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -71,7 +85,7 @@ export function Navbar() {
               strokeLinejoin="round"
               className="h-5 w-5"
               aria-hidden="true"
-            >
+              >
               {isOpen ? (
                 <>
                   <path d="M18 6 6 18" />
@@ -90,16 +104,16 @@ export function Navbar() {
 
         {isOpen ? (
           <div
-            id={menuId}
-            className="mt-3 space-y-2 border-t border-white/10 pt-3 sm:hidden"
+          id={menuId}
+          className="mt-3 space-y-2 border-t border-white/10 pt-3 sm:hidden"
           >
             <div className="grid gap-1">
               {navLinks.map((link) => (
                 <Link
-                  key={link.label}
-                  href={link.href}
-                  onClick={() => setIsOpen(false)}
-                  className="rounded-lg px-2 py-2 text-sm text-foreground/80 transition hover:bg-white/10 hover:text-foreground"
+                key={link.label}
+                href={link.href}
+                onClick={() => setIsOpen(false)}
+                className="rounded-lg px-2 py-2 text-sm text-foreground/80 transition hover:bg-black/10 hover:text-black"
                 >
                   {link.label}
                 </Link>
@@ -110,21 +124,22 @@ export function Navbar() {
               <Link
                 href="#"
                 onClick={() => setIsOpen(false)}
-                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-foreground/90 transition hover:bg-white/15 hover:text-foreground"
-              >
+                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-foreground/90 transition hover:bg-black/10 hover:text-black"
+                >
                 Account
               </Link>
               <Link
                 href="#"
                 onClick={() => setIsOpen(false)}
                 className="inline-flex items-center justify-center rounded-xl bg-foreground px-3 py-2 text-sm font-medium text-background transition hover:opacity-90"
-              >
+                >
                 Log in
               </Link>
             </div>
           </div>
         ) : null}
       </nav>
+    </header>
   );
 }
 

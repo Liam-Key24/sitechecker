@@ -8,15 +8,17 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write . --ignore-path .gitignore",
-    "format:check": "prettier --check . --ignore-path .gitignore"
+    "format:check": "prettier --check . --ignore-path .gitignore",
+    "fix-prisma": "rm -rf node_modules/@prisma node_modules/.prisma && npm install && npx prisma generate",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^2.0.2",
-    "@prisma/client": "^6.19.2",
+    "@prisma/client": "6.19.2",
     "better-sqlite3": "^12.6.2",
     "cheerio": "^1.2.0",
-    "next": "16.1.4",
-    "prisma": "^6.19.2",
+    "next": "^16.1.6",
+    "phosphor-react": "^1.4.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "zod": "^4.3.6"
@@ -29,8 +31,11 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.4",
     "eslint-config-prettier": "^10.1.8",
+    "i": "^0.3.7",
+    "npm": "^11.9.0",
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.6.14",
+    "prisma": "^6.19.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
