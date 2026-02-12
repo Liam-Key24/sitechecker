@@ -7,28 +7,31 @@ const globalForPrisma = globalThis as unknown as {
 
 function getResolvedDatabaseUrl(): string | undefined {
   const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) return undefined;
+  if (!databaseUrl || databaseUrl.trim() === '') return undefined;
   if (!databaseUrl.startsWith('file:')) return databaseUrl;
   const dbPath = databaseUrl.replace('file:', '');
   if (path.isAbsolute(dbPath)) return databaseUrl;
   return `file:${path.join(process.cwd(), dbPath)}`;
 }
 
+/** Placeholder URL used only when DATABASE_URL is missing at build time so PrismaClient constructor never receives undefined. */
+const BUILD_PLACEHOLDER_URL = 'file::memory:?cache=shared';
+
 function getDb(): PrismaClient {
-  const url = getResolvedDatabaseUrl();
-  if (!url) {
-    throw new Error(
-      'DATABASE_URL is not set. Set it in .env (e.g. DATABASE_URL="file:./dev.db") so the database can be used at runtime.'
-    );
+  let url = getResolvedDatabaseUrl();
+  const isPlaceholder = !url;
+  if (isPlaceholder) {
+    url = BUILD_PLACEHOLDER_URL;
   }
-  if (globalForPrisma.prisma) return globalForPrisma.prisma;
-  globalForPrisma.prisma = new PrismaClient({
+  if (!isPlaceholder && globalForPrisma.prisma) return globalForPrisma.prisma;
+  const client = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     datasources: {
       db: { url },
     },
   });
-  return globalForPrisma.prisma;
+  if (!isPlaceholder) globalForPrisma.prisma = client;
+  return client;
 }
 
 /** Lazy Prisma client: only created when first used, so build can succeed without DATABASE_URL. */
