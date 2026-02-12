@@ -5,29 +5,36 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// Ensure DATABASE_URL uses absolute path
-const databaseUrl = process.env.DATABASE_URL;
-let finalDatabaseUrl = databaseUrl;
-
-if (databaseUrl?.startsWith('file:')) {
+function getResolvedDatabaseUrl(): string | undefined {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) return undefined;
+  if (!databaseUrl.startsWith('file:')) return databaseUrl;
   const dbPath = databaseUrl.replace('file:', '');
-  if (!path.isAbsolute(dbPath)) {
-    // Convert relative path to absolute
-    const absolutePath = path.join(process.cwd(), dbPath);
-    finalDatabaseUrl = `file:${absolutePath}`;
-  }
+  if (path.isAbsolute(dbPath)) return databaseUrl;
+  return `file:${path.join(process.cwd(), dbPath)}`;
 }
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function getDb(): PrismaClient {
+  const url = getResolvedDatabaseUrl();
+  if (!url) {
+    throw new Error(
+      'DATABASE_URL is not set. Set it in .env (e.g. DATABASE_URL="file:./dev.db") so the database can be used at runtime.'
+    );
+  }
+  if (globalForPrisma.prisma) return globalForPrisma.prisma;
+  globalForPrisma.prisma = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     datasources: {
-      db: {
-        url: finalDatabaseUrl,
-      },
+      db: { url },
     },
   });
+  return globalForPrisma.prisma;
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
+/** Lazy Prisma client: only created when first used, so build can succeed without DATABASE_URL. */
+export const db = new Proxy({} as PrismaClient, {
+  get(_, prop) {
+    return (getDb() as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
 
