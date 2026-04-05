@@ -26,10 +26,14 @@ const steps = [
   },
 ] as const;
 
-export default function HowItWorksSection() {
-  return (
-    <section className="relative mx-auto w-[min(80rem,calc(100%-2rem))] py-20 md:py-28">
-      <div className="relative overflow-hidden rounded-3xl border border-stone-200/90 bg-linear-to-b from-stone-50/90 via-white to-primary/10 px-6 py-14 md:px-12 md:py-16">
+type HowItWorksSectionProps = {
+  /** Nested inside another section; drops outer width/padding shell */
+  embedded?: boolean;
+};
+
+export default function HowItWorksSection({ embedded = false }: HowItWorksSectionProps) {
+  const inner = (
+    <div className="relative overflow-hidden rounded-3xl border border-stone-200/90 bg-linear-to-b from-stone-50/90 via-white to-primary/10 px-6 py-14 md:px-12 md:py-16">
         <LandingDotGrid />
         <div className="relative z-10">
           <p className="text-center text-xs font-semibold uppercase tracking-widest text-emerald-900/70">
@@ -70,6 +74,15 @@ export default function HowItWorksSection() {
           </div>
         </div>
       </div>
+  );
+
+  if (embedded) {
+    return <div className="relative w-full">{inner}</div>;
+  }
+
+  return (
+    <section className="relative mx-auto w-[min(80rem,calc(100%-2rem))] py-20 md:py-28">
+      {inner}
     </section>
   );
 }
