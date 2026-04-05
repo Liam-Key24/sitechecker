@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased flex min-h-screen flex-col font-sans">
-        <header className="absolute top-0 left-0 right-0 z-10">
+        <header className="absolute top-0 left-0 right-0 z-100">
           <Navbar />
         </header>
         <main id="main-content" className="flex-1 pb-32" tabIndex={-1}>
