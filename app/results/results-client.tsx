@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } fr
 import { useRouter } from 'next/navigation';
 import type { Business, ResultsFiltersState } from './types';
 import ResultsLoading from './components/ResultsLoading';
+import ResultsOverview from './components/ResultsOverview';
 import ResultsHeader from './components/ResultsHeader';
 import ResultsGrid from './components/ResultsGrid';
 import { clampSearchLimitFromString, MAX_AUTO_ANALYZE_ON_LOAD } from '@/lib/searchLimits';
@@ -382,6 +383,7 @@ export default function ResultsClient({
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto w-[min(112rem,calc(100%-1.5rem))] px-3 py-8 sm:px-5 md:py-10">
+        <ResultsOverview businesses={businesses} />
         <ResultsHeader
           location={location}
           totalCount={businesses.length}
