@@ -1,5 +1,22 @@
+import { fetchWithPolicy } from '@/lib/network';
+import { consumeUpstreamBudget } from '@/lib/spendGuard';
+
+function parseBooleanEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') {
+    return true;
+  }
+  if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') {
+    return false;
+  }
+  return fallback;
+}
+
 const GOOGLE_PLACES_API_KEY =
   process.env.GOOGLE_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
+const GOOGLE_PLACES_DETAILS_ENABLED = parseBooleanEnv('GOOGLE_PLACES_DETAILS_ENABLED', true);
 
 if (!GOOGLE_PLACES_API_KEY) {
   console.warn('GOOGLE_API_KEY (or legacy GOOGLE_MAPS_API_KEY) is not set');
@@ -55,13 +72,14 @@ export async function searchGooglePlaces(
   let nextPageToken: string | undefined;
 
   do {
+    consumeUpstreamBudget('google_places_textsearch');
     const params = new URLSearchParams(
       nextPageToken ? { pagetoken: nextPageToken, key: GOOGLE_PLACES_API_KEY } : baseParams
     );
     const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?${params.toString()}`;
     console.log('Google Places API page request:', url.replace(GOOGLE_PLACES_API_KEY, 'API_KEY_HIDDEN'));
 
-    const response = await fetch(url);
+    const response = await fetchWithPolicy(url);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -105,6 +123,11 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlaceResul
   if (!GOOGLE_PLACES_API_KEY) {
     throw new Error('GOOGLE_API_KEY is not configured');
   }
+  if (!GOOGLE_PLACES_DETAILS_ENABLED) {
+    return null;
+  }
+
+  consumeUpstreamBudget('google_places_details');
 
   const params = new URLSearchParams({
     place_id: placeId,
@@ -112,7 +135,7 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlaceResul
     fields: 'place_id,name,website,formatted_address,formatted_phone_number,types,rating,user_ratings_total,geometry',
   });
 
-  const response = await fetch(
+  const response = await fetchWithPolicy(
     `https://maps.googleapis.com/maps/api/place/details/json?${params.toString()}`
   );
 

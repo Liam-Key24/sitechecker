@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CaretDown } from "phosphor-react";
 import { LocationField } from "./LocationField";
+import { clampSearchLimitFromString, MAX_KEYWORDS_LENGTH } from "@/lib/searchLimits";
 
 type Tab = "local" | "url";
 
@@ -73,10 +74,15 @@ export default function SearchForm() {
   const [category, setCategory] = useState("");
   const [keywords, setKeywords] = useState("");
   const [limit, setLimit] = useState("20");
+  const [urlNotice, setUrlNotice] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (tab === "url") return;
+    if (tab === "url") {
+      setUrlNotice("URL search is not available yet. Use Local search to find businesses.");
+      return;
+    }
+    setUrlNotice(null);
 
     setLoading(true);
     try {
@@ -84,7 +90,7 @@ export default function SearchForm() {
         location,
         ...(category && { category }),
         ...(keywords && { keywords }),
-        limit,
+        limit: String(clampSearchLimitFromString(limit, 20)),
       });
       router.push(`/results?${params.toString()}`);
     } catch (err) {
@@ -118,6 +124,7 @@ export default function SearchForm() {
             onClick={() => {
               setTab(id);
               setMoreOpen(false);
+              setUrlNotice(null);
             }}
             className={`rounded-full px-3 py-2.5 text-center text-sm font-semibold transition ${
               tab === id
@@ -130,7 +137,7 @@ export default function SearchForm() {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto flex justify-center items-center w-full">
         {tab === "local" ? (
           <div className="flex flex-col gap-5 pb-1">
             <LocationField value={location} onChange={setLocation} />
@@ -163,6 +170,7 @@ export default function SearchForm() {
                   <input
                     id="keywords"
                     type="text"
+                    maxLength={MAX_KEYWORDS_LENGTH}
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
                     placeholder="e.g., organic, vegan, 24/7"
@@ -190,6 +198,12 @@ export default function SearchForm() {
           </div>
         )}
       </div>
+
+      {urlNotice && (
+        <p className="shrink-0 text-center text-sm text-amber-800" role="status">
+          {urlNotice}
+        </p>
+      )}
 
       <div className="relative flex min-h-12 shrink-0 flex-col items-center justify-center gap-3 pt-2 sm:flex-row sm:gap-0">
         <button

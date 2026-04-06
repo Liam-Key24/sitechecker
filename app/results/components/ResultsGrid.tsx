@@ -1,5 +1,6 @@
 'use client';
 
+import { MagnifyingGlass } from 'phosphor-react';
 import ResultCard from '@/components/ResultCard';
 import type { Business } from '../types';
 
@@ -20,26 +21,26 @@ export default function ResultsGrid({
   onAnalyze,
   resultsLocation,
 }: ResultsGridProps) {
-  const isMasonry = columnCount === 4;
+  const useExpandedGrid = columnCount === 4;
   return (
     <>
-      <div className="mb-4 text-sm text-gray-600">
+      <div className="mb-4 inline-flex items-center rounded-full border border-stone-200/90 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-700 shadow-sm">
         Showing {businesses.length} of {totalCount} businesses
       </div>
       {businesses.length === 0 ? (
-        <div className="rounded-lg bg-white p-8 text-center text-gray-600 shadow">
-          No businesses match your filters.
+        <div className="rounded-2xl border border-stone-200/90 bg-white px-6 py-12 text-center shadow-lg shadow-black/5">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-emerald-950">
+            <MagnifyingGlass className="h-6 w-6" weight="duotone" />
+          </div>
+          <p className="text-base font-semibold text-emerald-950">No businesses match your filters</p>
+          <p className="mt-1 text-sm text-gray-600">
+            Try widening the score range or changing website/checked filters.
+          </p>
         </div>
-      ) : isMasonry ? (
-        <div
-          className="columns-1 gap-6 md:columns-4"
-          style={{ columnGap: '1.5rem' }}
-        >
+      ) : useExpandedGrid ? (
+        <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {businesses.map((business) => (
-            <div
-              key={business.id}
-              className="break-inside-avoid mb-6"
-            >
+            <div key={business.id}>
               <ResultCard
                 business={business}
                 onToggleChecked={onToggleChecked}

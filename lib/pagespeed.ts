@@ -1,10 +1,12 @@
+import type { PageSpeedResult } from '@/lib/contracts';
+import { fetchWithPolicy } from '@/lib/network';
+import { consumeUpstreamBudget, isUpstreamBudgetExceededError } from '@/lib/spendGuard';
+
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
 
 if (!GOOGLE_API_KEY) {
   console.warn('GOOGLE_API_KEY (or legacy GOOGLE_MAPS_API_KEY) is not set');
 }
-
-import type { PageSpeedResult } from '@/lib/contracts';
 
 export async function analyzePageSpeed(url: string): Promise<PageSpeedResult | null> {
   if (!GOOGLE_API_KEY) {
@@ -25,7 +27,9 @@ export async function analyzePageSpeed(url: string): Promise<PageSpeedResult | n
       params.append('category', 'best-practices');
       params.append('category', 'seo');
 
-      const response = await fetch(
+      consumeUpstreamBudget('google_pagespeed');
+
+      const response = await fetchWithPolicy(
         `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?${params.toString()}`
       );
 
@@ -78,6 +82,10 @@ export async function analyzePageSpeed(url: string): Promise<PageSpeedResult | n
       desktopPerformance: desktop?.performance,
     };
   } catch (error) {
+    if (isUpstreamBudgetExceededError(error)) {
+      console.warn('PageSpeed spend guard triggered:', error.message);
+      return null;
+    }
     console.error('PageSpeed analysis error:', error);
     return null;
   }

@@ -28,7 +28,6 @@ interface Business {
   categories: string[];
   google_rating: number | null;
   google_review_count: number | null;
-  foursquare_rating: number | null;
   final_score: number | null;
   checked: boolean;
   breakdown?: AnalysisBreakdown | null;
@@ -131,8 +130,6 @@ export default function ContactClient({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     fetch(`/api/business/${encodeURIComponent(businessId)}`)
       .then((res) => {
         if (!res.ok) throw new Error(res.status === 404 ? 'Business not found' : 'Failed to load');
@@ -184,7 +181,7 @@ export default function ContactClient({
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto w-[min(112rem,calc(100%-1.5rem))]">
       <div className="mb-6 flex items-center gap-4">
         <Link
           href={backHref}

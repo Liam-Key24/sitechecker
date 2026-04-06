@@ -1,20 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
+import { checkRateLimit, buildRateLimitHeaders, getClientIp } from '@/lib/security';
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
 }
 
+const ParamsSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+});
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const rate = checkRateLimit(`api:business:${getClientIp(request)}`, 120, 60_000);
+  const rateHeaders = buildRateLimitHeaders(rate);
+  const respond = (body: unknown, status = 200) =>
+    NextResponse.json(body, { status, headers: rateHeaders });
+  if (!rate.allowed) {
+    return respond({ error: 'Too many business detail requests. Please slow down.' }, 429);
+  }
+
   try {
-    const { id } = await params;
-    if (!id) {
-      return NextResponse.json({ error: 'Business ID is required' }, { status: 400 });
+    const parsed = ParamsSchema.safeParse(await params);
+    if (!parsed.success) {
+      return respond({ error: 'Invalid business ID', details: parsed.error.flatten() }, 400);
     }
+    const { id } = parsed.data;
 
     const business = await db.business.findUnique({
       where: { id },
@@ -24,7 +39,7 @@ export async function GET(
     });
 
     if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+      return respond({ error: 'Business not found' }, 404);
     }
 
     let breakdown: unknown = null;
@@ -35,14 +50,13 @@ export async function GET(
       } else {
         breakdown = {
           pagespeed_score: analysis.pagespeed_score,
-          foursquare_score: analysis.foursquare_score,
           final_score: business.final_score,
           weakness_notes: [],
         };
       }
     }
 
-    return NextResponse.json({
+    return respond({
       id: business.id,
       place_id: business.place_id,
       name: business.name,
@@ -52,7 +66,6 @@ export async function GET(
       categories: JSON.parse(business.categories || '[]'),
       google_rating: business.google_rating,
       google_review_count: business.google_review_count,
-      foursquare_rating: business.foursquare_rating,
       final_score: business.final_score,
       checked: business.checked,
       breakdown,
@@ -60,6 +73,6 @@ export async function GET(
   } catch (error: unknown) {
     const message = toErrorMessage(error);
     console.error('Business fetch error:', error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return respond({ error: message }, 500);
   }
 }

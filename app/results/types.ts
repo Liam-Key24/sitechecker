@@ -10,7 +10,6 @@ export interface Business {
   categories: string[];
   google_rating: number | null;
   google_review_count: number | null;
-  foursquare_rating: number | null;
   final_score: number | null;
   checked: boolean;
   breakdown?: AnalysisBreakdown | null;

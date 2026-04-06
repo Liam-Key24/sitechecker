@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 
 import type { WebsiteAnalysis } from '@/lib/contracts';
+import { fetchWithPolicy } from '@/lib/network';
 
 export async function analyzeWebsite(url: string): Promise<WebsiteAnalysis> {
   const analysis: WebsiteAnalysis = {
@@ -23,7 +24,7 @@ export async function analyzeWebsite(url: string): Promise<WebsiteAnalysis> {
   };
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithPolicy(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },

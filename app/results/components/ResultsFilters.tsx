@@ -5,15 +5,49 @@ import type { ResultsFiltersState } from '../types';
 interface ResultsFiltersProps {
   filters: ResultsFiltersState;
   onChange: (filters: ResultsFiltersState) => void;
+  embedded?: boolean;
 }
 
-export default function ResultsFilters({ filters, onChange }: ResultsFiltersProps) {
+const DEFAULT_FILTERS: ResultsFiltersState = {
+  scoreMin: '',
+  scoreMax: '',
+  hasWebsite: 'all',
+  checked: 'all',
+};
+
+export default function ResultsFilters({
+  filters,
+  onChange,
+  embedded = false,
+}: ResultsFiltersProps) {
+  const hasActiveFilters =
+    filters.scoreMin !== DEFAULT_FILTERS.scoreMin ||
+    filters.scoreMax !== DEFAULT_FILTERS.scoreMax ||
+    filters.hasWebsite !== DEFAULT_FILTERS.hasWebsite ||
+    filters.checked !== DEFAULT_FILTERS.checked;
+
   return (
-    <div className="mb-6 rounded-lg bg-white p-4 shadow">
-      <h2 className="mb-3 font-semibold text-gray-900">Filters</h2>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+    <div
+      className={`rounded-2xl border border-stone-200/90 bg-white p-4 shadow-lg shadow-black/5 sm:p-5 ${
+        embedded ? '' : 'mb-6'
+      }`}
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-950/85">
+          Refine results
+        </h2>
+        <button
+          type="button"
+          onClick={() => onChange(DEFAULT_FILTERS)}
+          disabled={!hasActiveFilters}
+          className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:border-primary/30 hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Clear filters
+        </button>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div>
-          <label htmlFor="filter-score-min" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="filter-score-min" className="mb-1.5 block text-sm font-medium text-emerald-950/90">
             Score Min
           </label>
           <input
@@ -23,13 +57,13 @@ export default function ResultsFilters({ filters, onChange }: ResultsFiltersProp
             max={100}
             value={filters.scoreMin}
             onChange={(e) => onChange({ ...filters, scoreMin: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+            className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="0"
             aria-label="Minimum score"
           />
         </div>
         <div>
-          <label htmlFor="filter-score-max" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="filter-score-max" className="mb-1.5 block text-sm font-medium text-emerald-950/90">
             Score Max
           </label>
           <input
@@ -39,20 +73,20 @@ export default function ResultsFilters({ filters, onChange }: ResultsFiltersProp
             max={100}
             value={filters.scoreMax}
             onChange={(e) => onChange({ ...filters, scoreMax: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+            className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="100"
             aria-label="Maximum score"
           />
         </div>
         <div>
-          <label htmlFor="filter-has-website" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="filter-has-website" className="mb-1.5 block text-sm font-medium text-emerald-950/90">
             Has Website
           </label>
           <select
             id="filter-has-website"
             value={filters.hasWebsite}
             onChange={(e) => onChange({ ...filters, hasWebsite: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+            className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             aria-label="Filter by has website"
           >
             <option value="all">All</option>
@@ -61,14 +95,14 @@ export default function ResultsFilters({ filters, onChange }: ResultsFiltersProp
           </select>
         </div>
         <div>
-          <label htmlFor="filter-checked" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="filter-checked" className="mb-1.5 block text-sm font-medium text-emerald-950/90">
             Checked Status
           </label>
           <select
             id="filter-checked"
             value={filters.checked}
             onChange={(e) => onChange({ ...filters, checked: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+            className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             aria-label="Filter by checked status"
           >
             <option value="all">All</option>

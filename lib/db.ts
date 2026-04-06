@@ -25,7 +25,8 @@ function getDb(): PrismaClient {
   }
   if (!isPlaceholder && globalForPrisma.prisma) return globalForPrisma.prisma;
   const client = new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Omit 'query' in dev to avoid terminal floods during search (each result triggers many writes).
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     datasources: {
       db: { url },
     },

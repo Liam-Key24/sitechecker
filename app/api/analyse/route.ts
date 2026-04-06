@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { analyzePageSpeed } from '@/lib/pagespeed';
 import { analyzeWebsite } from '@/lib/analyzer';
 import { calculateOpportunityScore } from '@/lib/scorer';
-import { getFoursquarePlaceDetails, searchFoursquare } from '@/lib/foursquare';
 import type { AnalysisBreakdown, WebsiteAnalysis } from '@/lib/contracts';
+import {
+  SECURITY_LIMITS,
+  checkRateLimit,
+  buildRateLimitHeaders,
+  getClientIp,
+  validateExternalWebsiteUrl,
+} from '@/lib/security';
+import { isUpstreamBudgetExceededError } from '@/lib/spendGuard';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -12,78 +20,134 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isAnalysisBreakdown(value: unknown): value is AnalysisBreakdown {
   if (!isRecord(value)) return false;
-  // minimal shape check; richer fields are optional
   return (
     'pagespeed_score' in value &&
-    'foursquare_score' in value &&
     'final_score' in value &&
-    'weakness_notes' in value
+    'weakness_notes' in value &&
+    Array.isArray(value.weakness_notes)
   );
 }
 
-function getGoogleLatLng(raw: unknown): { lat: number; lng: number } | null {
-  if (!isRecord(raw)) return null;
-  const geometry = raw.geometry;
-  if (!isRecord(geometry)) return null;
-  const location = geometry.location;
-  if (!isRecord(location)) return null;
-  const lat = location.lat;
-  const lng = location.lng;
-  return typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null;
+const AnalyseBodySchema = z.object({
+  businessId: z.string().trim().min(1).max(SECURITY_LIMITS.ANALYSE.MAX_BUSINESS_ID_CHARS),
+  force: z.boolean().optional().default(false),
+});
+
+const inFlightAnalyses = new Set<string>();
+
+function buildEmptyWebsiteAnalysis(reason: string): WebsiteAnalysis {
+  return {
+    hasHttps: false,
+    hasTitle: false,
+    hasMetaDescription: false,
+    hasH1: false,
+    hasSchema: false,
+    hasLocalBusinessSchema: false,
+    hasViewportMeta: false,
+    hasCanonical: false,
+    hasLangAttribute: false,
+    hasFavicon: false,
+    hasOpenGraph: false,
+    hasTwitterCard: false,
+    hasCTA: false,
+    hasContactForm: false,
+    hasReviews: false,
+    weaknessNotes: [reason],
+  };
+}
+
+function parseStoredBreakdown(raw: string | null): AnalysisBreakdown | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isAnalysisBreakdown(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function looksLegacyBreakdown(breakdown: AnalysisBreakdown | null): boolean {
+  return (
+    !breakdown ||
+    breakdown.pagespeed === undefined ||
+    breakdown.website === undefined ||
+    breakdown.web_standards_score === undefined
+  );
 }
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const rate = checkRateLimit(
+    `api:analyse:${ip}`,
+    SECURITY_LIMITS.ANALYSE.RATE_LIMIT_MAX,
+    SECURITY_LIMITS.ANALYSE.RATE_LIMIT_WINDOW_MS
+  );
+  const rateHeaders = buildRateLimitHeaders(rate);
+  const respond = (body: unknown, status = 200) =>
+    NextResponse.json(body, { status, headers: rateHeaders });
+
+  if (!rate.allowed) {
+    return respond({ error: 'Too many analysis requests. Please slow down.' }, 429);
+  }
+
+  let rawBody: unknown;
   try {
-    const body: unknown = await request.json();
-    const businessId =
-      isRecord(body) && typeof body.businessId === 'string' ? body.businessId : undefined;
-    const force = isRecord(body) && typeof body.force === 'boolean' ? body.force : undefined;
+    rawBody = await request.json();
+  } catch {
+    return respond({ error: 'Invalid JSON body' }, 400);
+  }
 
-    if (!businessId) {
-      return NextResponse.json({ error: 'businessId is required' }, { status: 400 });
-    }
+  const parsed = AnalyseBodySchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return respond({ error: 'Invalid request body', details: parsed.error.flatten() }, 400);
+  }
 
-    // Fetch business
+  const { businessId, force } = parsed.data;
+
+  if (inFlightAnalyses.has(businessId)) {
+    return respond(
+      { error: 'Analysis already in progress for this business. Please retry shortly.' },
+      429
+    );
+  }
+  inFlightAnalyses.add(businessId);
+
+  try {
     const business = await db.business.findUnique({
       where: { id: businessId },
     });
 
     if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+      return respond({ error: 'Business not found' }, 404);
     }
 
-    // Check if we have a recent analysis (within 7 days)
-    const recentAnalysis = await db.analysis.findFirst({
+    const latestAnalysis = await db.analysis.findFirst({
       where: {
         businessId: business.id,
-        created_at: {
-          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        },
       },
       orderBy: {
         created_at: 'desc',
       },
     });
 
-    if (recentAnalysis && !force) {
-      const breakdownUnknown: unknown = recentAnalysis.breakdown_json
-        ? JSON.parse(recentAnalysis.breakdown_json)
-        : null;
-      const breakdown = isAnalysisBreakdown(breakdownUnknown) ? breakdownUnknown : null;
+    const isMockBusiness = business.place_id.startsWith('mock:');
+    if (isMockBusiness) {
+      const mockBreakdown = parseStoredBreakdown(latestAnalysis?.breakdown_json ?? null);
+      return respond({
+        final_score: business.final_score ?? mockBreakdown?.final_score ?? null,
+        breakdown: mockBreakdown,
+        cached: true,
+        mock: true,
+      });
+    }
 
-      // If this is an older breakdown without richer fields, refresh once.
-      const looksLegacy =
-        !breakdown ||
-        breakdown.pagespeed === undefined ||
-        breakdown.website === undefined ||
-        breakdown.web_standards_score === undefined;
+    if (latestAnalysis) {
+      const breakdown = parseStoredBreakdown(latestAnalysis.breakdown_json);
+      const isLegacy = looksLegacyBreakdown(breakdown);
 
-      if (!looksLegacy) {
-        // If Business.final_score was never backfilled, use the breakdown/analysis value.
+      if (!isLegacy) {
         const finalFromBreakdown =
-          breakdown && typeof breakdown.final_score === 'number'
-            ? breakdown.final_score
-            : null;
+          breakdown && typeof breakdown.final_score === 'number' ? breakdown.final_score : null;
 
         if (business.final_score === null && finalFromBreakdown !== null) {
           await db.business.update({
@@ -92,134 +156,61 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        return NextResponse.json({
+        const cachedPayload = {
           final_score: business.final_score ?? finalFromBreakdown,
-          breakdown: breakdown || {
-            pagespeed_score: recentAnalysis.pagespeed_score,
-            foursquare_score: recentAnalysis.foursquare_score,
-            final_score: business.final_score ?? finalFromBreakdown,
-            weakness_notes: [],
-          },
-        });
-      }
-
-      // fall through to re-analyze
-    }
-
-    // Refresh Foursquare authority during analysis (if possible)
-    let foursquareRating = business.foursquare_rating;
-    let foursquarePopularity = business.foursquare_popularity;
-    let foursquareFsqId: string | undefined;
-    let foursquareMatchConfidence: number | null = business.foursquare_match_confidence ?? null;
-
-    try {
-      const googleSnapshot = await db.sourceSnapshot.findFirst({
-        where: { businessId: business.id, provider: 'google' },
-        orderBy: { created_at: 'desc' },
-      });
-
-      if (googleSnapshot?.raw_data) {
-        const googleRaw: unknown = JSON.parse(googleSnapshot.raw_data);
-        const ll = getGoogleLatLng(googleRaw);
-
-        if (ll) {
-          const match = await searchFoursquare(
-            business.name,
-            ll.lat,
-            ll.lng,
-            business.address ?? undefined
-          );
-
-          if (match?.fsq_id) {
-            foursquareFsqId = match.fsq_id;
-            // Basic token overlap similarity (0-1) for a rough confidence.
-            const n1 = business.name.toLowerCase().split(/\s+/);
-            const n2 = match.name.toLowerCase().split(/\s+/);
-            const common = n1.filter((t: string) => n2.includes(t));
-            foursquareMatchConfidence = common.length / Math.max(n1.length, n2.length);
-
-            const details = await getFoursquarePlaceDetails(match.fsq_id);
-            const payload = details ?? match;
-
-            const newRating =
-              typeof payload.rating === 'number' ? payload.rating : foursquareRating;
-            const newPopularity =
-              typeof payload.popularity === 'number' ? payload.popularity : foursquarePopularity;
-
-            foursquareRating = newRating ?? null;
-            foursquarePopularity = newPopularity ?? null;
-
-            await db.business.update({
-              where: { id: business.id },
-              data: {
-                foursquare_rating: foursquareRating,
-                foursquare_popularity: foursquarePopularity,
-                foursquare_match_confidence: foursquareMatchConfidence,
-              },
-            });
-
-            await db.sourceSnapshot.deleteMany({
-              where: { businessId: business.id, provider: 'foursquare' },
-            });
-            await db.sourceSnapshot.create({
-              data: {
-                businessId: business.id,
-                provider: 'foursquare',
-                raw_data: JSON.stringify(payload),
-              },
-            });
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Foursquare refresh error:', e);
-    }
-
-    // Analyze website (if present); otherwise run "presence" analysis only.
-    const websiteAnalysis: WebsiteAnalysis = business.website
-      ? await analyzeWebsite(business.website)
-      : {
-          hasHttps: false,
-          hasTitle: false,
-          hasMetaDescription: false,
-          hasH1: false,
-          hasSchema: false,
-          hasLocalBusinessSchema: false,
-          hasViewportMeta: false,
-          hasCanonical: false,
-          hasLangAttribute: false,
-          hasFavicon: false,
-          hasOpenGraph: false,
-          hasTwitterCard: false,
-          hasCTA: false,
-          hasContactForm: false,
-          hasReviews: false,
-          weaknessNotes: ['No website found'],
+          breakdown,
         };
 
-    const pagespeedResult = business.website ? await analyzePageSpeed(business.website) : null;
+        const now = Date.now();
+        const ageMs = now - latestAnalysis.created_at.getTime();
+        const withinRecentTtl = ageMs <= SECURITY_LIMITS.ANALYSE.RECENT_ANALYSIS_TTL_MS;
+        const withinCooldown = ageMs <= SECURITY_LIMITS.ANALYSE.MIN_REANALYZE_INTERVAL_MS;
 
-    // Calculate scores
-    const scoreBreakdown = calculateOpportunityScore(
-      pagespeedResult,
-      websiteAnalysis,
-      foursquareRating,
-      foursquarePopularity,
-      { fsq_id: foursquareFsqId, match_confidence: foursquareMatchConfidence }
-    );
+        if (
+          withinCooldown &&
+          (!force || !SECURITY_LIMITS.ANALYSE.ALLOW_FORCE_BYPASS_COOLDOWN)
+        ) {
+          return respond({
+            ...cachedPayload,
+            cached: true,
+            cooldown_active: true,
+          });
+        }
 
-    // Store analysis
+        if (withinRecentTtl && !force) {
+          return respond({
+            ...cachedPayload,
+            cached: true,
+          });
+        }
+      }
+    }
+
+    let analysisUrl: string | null = null;
+    if (business.website) {
+      const urlCheck = validateExternalWebsiteUrl(business.website);
+      if (urlCheck.ok) analysisUrl = urlCheck.normalizedUrl;
+    }
+
+    const websiteAnalysis: WebsiteAnalysis = analysisUrl
+      ? await analyzeWebsite(analysisUrl)
+      : buildEmptyWebsiteAnalysis(
+          business.website ? 'Website URL blocked by security policy' : 'No website found'
+        );
+
+    const pagespeedResult = analysisUrl ? await analyzePageSpeed(analysisUrl) : null;
+
+    const scoreBreakdown = calculateOpportunityScore(pagespeedResult, websiteAnalysis);
+
     await db.analysis.create({
       data: {
         businessId: business.id,
         pagespeed_score: scoreBreakdown.pagespeed_score,
         yelp_score: null,
-        foursquare_score: scoreBreakdown.foursquare_score,
         breakdown_json: JSON.stringify(scoreBreakdown),
       },
     });
 
-    // Update business final score
     await db.business.update({
       where: { id: business.id },
       data: {
@@ -227,17 +218,27 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    return respond({
       final_score: scoreBreakdown.final_score,
       breakdown: scoreBreakdown,
     });
   } catch (error: unknown) {
+    if (isUpstreamBudgetExceededError(error)) {
+      return NextResponse.json(
+        { error: error.message, code: 'UPSTREAM_BUDGET_EXCEEDED' },
+        {
+          status: 429,
+          headers: {
+            ...rateHeaders,
+            'Retry-After': String(error.retryAfterSec),
+          },
+        }
+      );
+    }
     console.error('Analysis error:', error);
     const message = error instanceof Error ? error.message : 'Failed to analyze website';
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
+    return respond({ error: message }, 500);
+  } finally {
+    inFlightAnalyses.delete(businessId);
   }
 }
-

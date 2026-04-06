@@ -1,25 +1,36 @@
-import { Suspense } from 'react';
 import ResultsClient from '@/app/results/results-client';
+import { clampSearchLimitFromString } from '@/lib/searchLimits';
 
-function ResultsFallback() {
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading results...</p>
-      </div>
-    </div>
-  );
+type RawSearchParams = Record<string, string | string[] | undefined>;
+
+function firstString(v: string | string[] | undefined): string {
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v) && typeof v[0] === 'string') return v[0];
+  return '';
 }
 
-export default function ResultsPage() {
+export default async function ResultsPage({
+  searchParams,
+}: {
+  searchParams: Promise<RawSearchParams> | RawSearchParams;
+}) {
+  const sp = await Promise.resolve(searchParams);
+  const location = firstString(sp.location);
+  const category = firstString(sp.category);
+  const keywords = firstString(sp.keywords);
+  const limit = String(clampSearchLimitFromString(firstString(sp.limit), 20));
+
+  const queryKey = `${location}|${category}|${keywords}|${limit}`;
+
   return (
     <div className="pt-28">
-
-    <Suspense fallback={<ResultsFallback />}>
-      <ResultsClient />
-    </Suspense>
+      <ResultsClient
+        key={queryKey}
+        location={location}
+        category={category}
+        keywords={keywords}
+        limit={limit}
+      />
     </div>
   );
 }
-

@@ -23,9 +23,6 @@ model Business {
   yelp_rating           Float?
   yelp_review_count     Int?
   yelp_match_confidence Float?
-  foursquare_rating    Float?
-  foursquare_popularity Float?
-  foursquare_match_confidence Float?
   final_score           Float?
   checked               Boolean  @default(false)
   last_scanned          DateTime @default(now())
@@ -45,7 +42,6 @@ model Analysis {
   businessId        String
   pagespeed_score   Float?
   yelp_score        Float?
-  foursquare_score  Float?
   breakdown_json    String?  // JSON stored as string
   created_at        DateTime @default(now())
 
@@ -57,7 +53,7 @@ model Analysis {
 model SourceSnapshot {
   id          String   @id @default(cuid())
   businessId  String
-  provider    String   // 'google', 'yelp', 'foursquare'
+  provider    String   // e.g. 'google', 'yelp'
   raw_data    String   // JSON stored as string
   created_at  DateTime @default(now())
 

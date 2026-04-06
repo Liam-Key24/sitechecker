@@ -4,42 +4,43 @@ import { useState } from 'react';
 import { Monitor, DeviceMobile, Globe, CaretDown, CaretUp } from 'phosphor-react';
 import type { AnalysisBreakdown } from '@/lib/contracts';
 
-const SEGMENTS = 10;
-
 function ScoreCard({
   icon: Icon,
   title,
   score,
-  subtext,
+  badgeLabel,
+  badgeClassName,
 }: {
   icon: React.ElementType;
   title: string;
   score: number;
-  subtext?: string;
+  badgeLabel?: string;
+  badgeClassName?: string;
 }) {
   const clamped = Math.min(100, Math.max(0, Math.round(score)));
-  const filled = Math.round((clamped / 100) * SEGMENTS);
   return (
-    <div className="rounded-xl border border-gray-200/80 bg-gray-50/80 p-4 shadow-sm">
+    <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2 text-gray-600">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
-          <Icon className="h-5 w-5" weight="duotone" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-emerald-950">
+          <Icon className="h-4.5 w-4.5" weight="duotone" />
         </div>
-        <span className="text-sm font-medium">{title}</span>
+        <span className="text-sm font-semibold text-emerald-950">{title}</span>
       </div>
-      <p className="mt-3 text-2xl font-bold tabular-nums text-gray-900">{clamped}</p>
-      {subtext && (
-        <p className="mt-0.5 text-xs text-gray-500">{subtext}</p>
-      )}
-      <div className="mt-3 flex gap-0.5" aria-hidden>
-        {Array.from({ length: SEGMENTS }, (_, i) => (
-          <div
-            key={i}
-            className={`h-1.5 flex-1 rounded-sm transition-colors ${
-              i < filled ? 'bg-primary' : 'bg-gray-200'
-            }`}
-          />
-        ))}
+      <p className="mt-4 text-4xl font-bold tabular-nums leading-none text-emerald-950">
+        {clamped}
+        <span className="ml-1 text-xl font-semibold text-gray-500">/100</span>
+      </p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <div className="flex items-center gap-2 text-gray-600">
+          <p className="text-sm text-gray-500">Score</p>
+        </div>
+        {badgeLabel && (
+          <span
+            className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClassName ?? ''}`}
+          >
+            {badgeLabel}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -48,11 +49,90 @@ function ScoreCard({
 interface BreakdownProps {
   data: AnalysisBreakdown;
   initialOpen?: boolean;
+  showToggle?: boolean;
 }
 
-export default function Breakdown({ data, initialOpen = false }: BreakdownProps) {
-  const [isOpen, setIsOpen] = useState(initialOpen);
-  const weaknessNotes = data.weakness_notes ?? [];
+function scoreStrengthLabel(score: number): string {
+  if (score >= 81) return 'Strong';
+  if (score >= 61) return 'Healthy';
+  if (score >= 41) return 'Needs work';
+  return 'Critical';
+}
+
+function scoreStrengthClass(score: number): string {
+  if (score >= 81) return 'bg-primary/35 text-emerald-950';
+  if (score >= 61) return 'bg-primary/25 text-emerald-950';
+  if (score >= 41) return 'bg-amber-100 text-amber-900';
+  return 'bg-red-100 text-red-800';
+}
+
+type IssueBucket = 'performance' | 'seo' | 'ux' | 'content' | 'other';
+
+function classifyIssue(note: string): IssueBucket {
+  const n = note.toLowerCase();
+  if (
+    n.includes('pagespeed') ||
+    n.includes('lcp') ||
+    n.includes('cls') ||
+    n.includes('inp') ||
+    n.includes('performance') ||
+    n.includes('mobile-friendly')
+  ) {
+    return 'performance';
+  }
+  if (
+    n.includes('schema') ||
+    n.includes('canonical') ||
+    n.includes('meta') ||
+    n.includes('title') ||
+    n.includes('h1') ||
+    n.includes('seo')
+  ) {
+    return 'seo';
+  }
+  if (n.includes('cta') || n.includes('contact form') || n.includes('viewport')) {
+    return 'ux';
+  }
+  if (n.includes('review') || n.includes('testimonial') || n.includes('twitter') || n.includes('open graph')) {
+    return 'content';
+  }
+  return 'other';
+}
+
+function getSeverity(note: string): 'high' | 'medium' | 'low' {
+  const n = note.toLowerCase();
+  if (
+    n.includes('no website') ||
+    n.includes('poor lcp') ||
+    n.includes('high cls') ||
+    n.includes('poor inp') ||
+    n.includes('low pagespeed') ||
+    n.includes('not mobile-friendly')
+  ) {
+    return 'high';
+  }
+  if (
+    n.includes('missing viewport') ||
+    n.includes('missing canonical') ||
+    n.includes('no schema') ||
+    n.includes('no clear call-to-action') ||
+    n.includes('no meta description') ||
+    n.includes('no h1')
+  ) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+export default function Breakdown({
+  data,
+  initialOpen = false,
+  showToggle = true,
+}: BreakdownProps) {
+  const [isOpen, setIsOpen] = useState(showToggle ? initialOpen : true);
+  const weaknessNotes = (data.weakness_notes ?? []).filter(
+    (n) => typeof n === 'string' && !/foursquare/i.test(n)
+  );
   const noWebsite = weaknessNotes.includes('No website found');
 
   const desktopScore =
@@ -73,44 +153,73 @@ export default function Breakdown({ data, initialOpen = false }: BreakdownProps)
     typeof data.web_standards_score === 'number' && data.web_standards_score !== null;
   const hasWeaknesses = weaknessNotes.length > 0;
   const hasAnyScore = hasDesktop || hasMobile || hasWebStandards;
+  const issueCountsByBucket = weaknessNotes.reduce<Record<IssueBucket, number>>(
+    (acc, note) => {
+      acc[classifyIssue(note)] += 1;
+      return acc;
+    },
+    { performance: 0, seo: 0, ux: 0, content: 0, other: 0 }
+  );
+  const severityCounts = weaknessNotes.reduce(
+    (acc, note) => {
+      acc[getSeverity(note)] += 1;
+      return acc;
+    },
+    { high: 0, medium: 0, low: 0 }
+  );
+  const topBuckets = (Object.entries(issueCountsByBucket) as Array<[IssueBucket, number]>)
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  const bucketLabel: Record<IssueBucket, string> = {
+    performance: 'Performance',
+    seo: 'SEO',
+    ux: 'UX',
+    content: 'Content',
+    other: 'Other',
+  };
 
   if (!hasAnyScore && !hasWeaknesses && noWebsite) {
     return null;
   }
 
   return (
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-primary transition-colors duration-200"
-      >
-        {isOpen ? <CaretUp className="h-4 w-4" /> : <CaretDown className="h-4 w-4" />}
-        {isOpen ? 'Hide' : 'Show'} score breakdown
-      </button>
+    <div>
+      {showToggle && (
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-700 shadow-sm transition hover:border-primary/30 hover:bg-primary/10 hover:text-emerald-950 focus:outline-none focus:ring-2 focus:ring-primary/20"
+        >
+          {isOpen ? <CaretUp className="h-4 w-4" /> : <CaretDown className="h-4 w-4" />}
+          {isOpen ? 'Hide breakdown' : 'Show breakdown'}
+        </button>
+      )}
 
       <div
         className="grid transition-[grid-template-rows] duration-300 ease-out"
         style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="mt-3 space-y-4">
+          <div className="mt-3 space-y-4 rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 sm:p-5">
             {(hasDesktop || hasMobile || hasWebStandards) && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 {hasDesktop && (
                   <ScoreCard
                     icon={Monitor}
                     title="Web desktop"
-                    score={desktopScore!}
-                    subtext="Performance score"
+                    score={desktopScore}
+                    badgeLabel={scoreStrengthLabel(desktopScore)}
+                    badgeClassName={scoreStrengthClass(desktopScore)}
                   />
                 )}
                 {hasMobile && (
                   <ScoreCard
                     icon={DeviceMobile}
                     title="Mobile"
-                    score={mobileScore!}
-                    subtext="Performance score"
+                    score={mobileScore}
+                    badgeLabel={scoreStrengthLabel(mobileScore)}
+                    badgeClassName={scoreStrengthClass(mobileScore)}
                   />
                 )}
                 {hasWebStandards && (
@@ -118,28 +227,69 @@ export default function Breakdown({ data, initialOpen = false }: BreakdownProps)
                     icon={Globe}
                     title="Web standards"
                     score={data.web_standards_score as number}
-                    subtext="On-page checks"
+                    badgeLabel={scoreStrengthLabel(data.web_standards_score as number)}
+                    badgeClassName={scoreStrengthClass(data.web_standards_score as number)}
                   />
                 )}
               </div>
             )}
 
             {hasWeaknesses && (
-              <div className="rounded-xl border border-gray-200/80 bg-gray-50/80 p-4">
-                <p className="text-sm font-medium text-gray-700">Weaknesses</p>
-                <ul className="mt-2 space-y-1 text-sm text-gray-600">
-                  {weaknessNotes.map((note, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
-                      {note}
-                    </li>
-                  ))}
-                </ul>
+              <div className="rounded-xl border border-stone-200/90 bg-white p-4 sm:p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-emerald-950">Issue breakdown</p>
+                  <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-medium text-gray-600">
+                    {weaknessNotes.length} total
+                  </span>
+                </div>
+
+                <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">High severity</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-red-700">{severityCounts.high}</p>
+                  </div>
+                  <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Medium severity</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-amber-700">{severityCounts.medium}</p>
+                  </div>
+                  <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Low severity</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-gray-700">{severityCounts.low}</p>
+                  </div>
+                </div>
+
+                {topBuckets.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {topBuckets.map(([bucket, count]) => (
+                      <span
+                        key={bucket}
+                        className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-medium text-gray-700"
+                      >
+                        {bucketLabel[bucket]}: {count}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {weaknessNotes.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {weaknessNotes.map((note, idx) => (
+                      <div
+                        key={`${idx}-${note}`}
+                        className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-gray-700"
+                      >
+                        {note}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {noWebsite && !hasAnyScore && (
-              <p className="text-sm text-gray-500">No website — scores not available.</p>
+              <p className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-gray-600">
+                No website, so performance scores are not available yet.
+              </p>
             )}
           </div>
         </div>

@@ -33,19 +33,10 @@ export interface PageSpeedResult {
 
 export interface AnalysisBreakdown {
   pagespeed_score: number | null;
-  foursquare_score: number | null;
   final_score: number | null;
   web_standards_score?: number | null;
   weakness_notes: string[];
 
-  // Optional richer payload for UI.
   pagespeed?: PageSpeedResult | null;
   website?: WebsiteAnalysis;
-  foursquare?: {
-    fsq_id?: string;
-    rating?: number | null;
-    popularity?: number | null;
-    match_confidence?: number | null;
-  };
 }
-

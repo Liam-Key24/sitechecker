@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Business, ResultsFiltersState } from './types';
 import ResultsLoading from './components/ResultsLoading';
 import ResultsHeader from './components/ResultsHeader';
-import ResultsFilters from './components/ResultsFilters';
 import ResultsGrid from './components/ResultsGrid';
+import { clampSearchLimitFromString, MAX_AUTO_ANALYZE_ON_LOAD } from '@/lib/searchLimits';
 
 const DEFAULT_FILTERS: ResultsFiltersState = {
   scoreMin: '',
@@ -15,22 +15,31 @@ const DEFAULT_FILTERS: ResultsFiltersState = {
   checked: 'all',
 };
 
-export default function ResultsClient() {
-  const searchParams = useSearchParams();
+export type ResultsClientProps = {
+  location: string;
+  category: string;
+  keywords: string;
+  /** Normalized limit string (e.g. "20") from the URL */
+  limit: string;
+};
+
+export default function ResultsClient({
+  location,
+  category,
+  keywords,
+  limit,
+}: ResultsClientProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(location));
   const [analyzingAll, setAnalyzingAll] = useState(false);
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [usingMockData, setUsingMockData] = useState(false);
   const [filters, setFilters] = useState<ResultsFiltersState>(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
   const [columnCount, setColumnCount] = useState<2 | 4>(2);
   const [sortBy, setSortBy] = useState<'default' | 'score-desc' | 'score-asc' | 'name'>('default');
 
-  const location = searchParams.get('location') || '';
-  const category = searchParams.get('category') || '';
-  const keywords = searchParams.get('keywords') || '';
-  const limit = searchParams.get('limit') || '20';
-  const pageSize = Math.max(10, parseInt(limit, 10) || 20);
+  const pageSize = clampSearchLimitFromString(limit, 20);
   const [displayCount, setDisplayCount] = useState(pageSize);
 
   const handleAnalyze = useCallback(async (id: string, options?: { force?: boolean }) => {
@@ -72,19 +81,44 @@ export default function ResultsClient() {
   }, []);
 
   const needsAnalysis = useCallback((b: Business) => {
-    if (b.final_score === null) return true;
-    if (!b.breakdown) return true;
+    if (!b.breakdown) return b.final_score === null;
+    const d = b.breakdown;
+    if (typeof d.final_score === 'number') return false;
+    if (d.pagespeed_score != null && d.web_standards_score != null) return false;
     if (
-      b.breakdown.pagespeed === undefined ||
-      b.breakdown.website === undefined ||
-      b.breakdown.web_standards_score === undefined
+      d.pagespeed !== undefined &&
+      d.website !== undefined &&
+      d.web_standards_score !== undefined
     ) {
-      return true;
+      return false;
     }
-    return false;
+    return true;
   }, []);
 
+  const handleAnalyzeRef = useRef(handleAnalyze);
+  handleAnalyzeRef.current = handleAnalyze;
+  const needsAnalysisRef = useRef(needsAnalysis);
+  needsAnalysisRef.current = needsAnalysis;
+  /** Bumps on each search effect run so aborted/outdated fetches do not leave loading stuck or overwrite newer data. */
+  const searchFetchGenRef = useRef(0);
+
+  // Clear loading before paint when there is nothing to fetch (avoids a loading flash on /results).
+  useLayoutEffect(() => {
+    if (!location) {
+      setLoading(false);
+      setBusinesses([]);
+      setUsingMockData(false);
+    }
+  }, [location]);
+
   useEffect(() => {
+    if (!location) {
+      return;
+    }
+
+    const ac = new AbortController();
+    const gen = ++searchFetchGenRef.current;
+
     const fetchResults = async () => {
       setLoading(true);
       try {
@@ -95,46 +129,89 @@ export default function ResultsClient() {
           ...(keywords && { keywords }),
         });
         const url = `/api/search?${params.toString()}`;
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: ac.signal });
         const bodyText = await response.text();
 
-        let data: { businesses?: Business[]; error?: string };
+        let data: { businesses?: Business[]; error?: string; code?: string; mock?: boolean };
         try {
-          data = JSON.parse(bodyText) as { businesses?: Business[]; error?: string };
+          data = JSON.parse(bodyText) as {
+            businesses?: Business[];
+            error?: string;
+            code?: string;
+            mock?: boolean;
+          };
         } catch {
+          if (gen !== searchFetchGenRef.current) return;
           const msg =
             response.status >= 500
               ? 'Server error. Please try again later.'
               : 'Something went wrong. Please try again.';
           alert(msg);
           setBusinesses([]);
-          setLoading(false);
+          setUsingMockData(false);
           return;
         }
 
         if (!response.ok) {
+          if (gen !== searchFetchGenRef.current) return;
           console.error('API Error:', data);
-          alert(`Error: ${data.error ?? 'Failed to fetch results'}`);
+          const code =
+            data && typeof data === 'object' && 'code' in data
+              ? String((data as { code?: unknown }).code)
+              : '';
+          const detail = data?.error ?? 'Failed to fetch results';
+          if (response.status === 503 && code === 'MISSING_GOOGLE_KEY') {
+            alert(
+              `Search is not configured: ${detail}\n\nAdd GOOGLE_API_KEY (Places + billing enabled) to .env.local and restart the dev server.`
+            );
+          } else if (response.status === 429) {
+            const retryAfter = response.headers.get('Retry-After');
+            if (code === 'UPSTREAM_BUDGET_EXCEEDED') {
+              alert(
+                `Safety cap reached for external API spend. ${retryAfter ? `Please retry in about ${retryAfter}s.` : 'Please wait a moment and try again.'}`
+              );
+            } else {
+              alert(
+                `Too many requests right now. ${retryAfter ? `Please retry in about ${retryAfter}s.` : 'Please wait a moment and try again.'}`
+              );
+            }
+          } else {
+            alert(`Error: ${detail}`);
+          }
           setBusinesses([]);
+          setUsingMockData(false);
           return;
         }
+
+        if (gen !== searchFetchGenRef.current) return;
 
         const fetchedBusinesses: Business[] = Array.isArray(data.businesses)
           ? data.businesses
           : [];
         setBusinesses(fetchedBusinesses);
-        setDisplayCount(fetchedBusinesses.length > 0 ? fetchedBusinesses.length : pageSize);
+        setUsingMockData(Boolean(data.mock));
+        const initialVisible = clampSearchLimitFromString(limit, 20);
+        setDisplayCount(
+          fetchedBusinesses.length > 0 ? fetchedBusinesses.length : initialVisible
+        );
 
         if (fetchedBusinesses.length === 0) {
           console.warn('No businesses returned from API');
         } else {
-          const toAnalyze = fetchedBusinesses.filter((b) => needsAnalysis(b));
+          const na = needsAnalysisRef.current;
+          const needsList = fetchedBusinesses.filter((b) => na(b));
+          const toAnalyze = needsList.slice(0, MAX_AUTO_ANALYZE_ON_LOAD);
           if (toAnalyze.length > 0) {
-            console.log(`Auto-analyzing ${toAnalyze.length} businesses missing analysis...`);
+            const skipped = needsList.length - toAnalyze.length;
+            console.log(
+              `Auto-analyzing ${toAnalyze.length} business(es)${skipped > 0 ? ` (${skipped} more skipped; use Analyze on a card or Analyze all)` : ''}...`
+            );
+            const runAnalyze = handleAnalyzeRef.current;
             (async () => {
               for (const business of toAnalyze) {
+                if (ac.signal.aborted) break;
                 try {
-                  await handleAnalyze(business.id);
+                  await runAnalyze(business.id);
                   await new Promise((resolve) => setTimeout(resolve, 1500));
                 } catch (error) {
                   console.error(`Error auto-analyzing business ${business.id}:`, error);
@@ -143,21 +220,23 @@ export default function ResultsClient() {
             })();
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        if (gen !== searchFetchGenRef.current) return;
         console.error('Error fetching results:', error);
         alert(
           `Error: ${error instanceof Error ? error.message : 'Failed to fetch results'}`
         );
         setBusinesses([]);
+        setUsingMockData(false);
       } finally {
-        setLoading(false);
+        if (gen === searchFetchGenRef.current) setLoading(false);
       }
     };
 
-    if (location) {
-      fetchResults();
-    }
-  }, [location, category, keywords, limit, handleAnalyze, needsAnalysis]);
+    fetchResults();
+    return () => ac.abort();
+  }, [location, category, keywords, limit]);
 
   const handleToggleChecked = useCallback(async (id: string, checked: boolean) => {
     try {
@@ -207,11 +286,14 @@ export default function ResultsClient() {
 
   const handleLimitChange = useCallback(
     (newLimit: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('limit', newLimit);
+      const params = new URLSearchParams();
+      if (location) params.set('location', location);
+      if (category) params.set('category', category);
+      if (keywords) params.set('keywords', keywords);
+      params.set('limit', String(clampSearchLimitFromString(newLimit, 20)));
       router.replace(`/results?${params.toString()}`);
     },
-    [router, searchParams]
+    [router, location, category, keywords]
   );
 
   const handleExportCSV = useCallback(() => {
@@ -275,9 +357,31 @@ export default function ResultsClient() {
     return <ResultsLoading />;
   }
 
+  if (!location) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto flex min-h-[55vh] w-[min(112rem,calc(100%-1.5rem))] flex-col items-center justify-center px-4 py-16 text-center">
+          <h1 className="text-2xl font-bold text-emerald-950">No search location</h1>
+          <p className="mt-3 max-w-md text-gray-600">
+            Add a place to search from the search page, or open a results link that includes a{" "}
+            <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm">location</code> query
+            parameter.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push('/search')}
+            className="mt-8 rounded-full bg-primary px-8 py-3 font-semibold text-emerald-950 shadow-sm transition hover:brightness-95"
+          >
+            Go to search
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+      <div className="mx-auto w-[min(112rem,calc(100%-1.5rem))] px-3 py-8 sm:px-5 md:py-10">
         <ResultsHeader
           location={location}
           totalCount={businesses.length}
@@ -293,9 +397,14 @@ export default function ResultsClient() {
           onToggleFilters={() => setShowFilters((v) => !v)}
           onColumnCountChange={setColumnCount}
           onSortChange={setSortBy}
+          filters={filters}
+          onFiltersChange={setFilters}
         />
-        {showFilters && (
-          <ResultsFilters filters={filters} onChange={setFilters} />
+        {usingMockData && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-900 shadow-sm">
+            <span className="font-semibold">Mock mode:</span> results are sample businesses for UI
+            preview only.
+          </div>
         )}
         <ResultsGrid
           businesses={visibleBusinesses}
@@ -312,7 +421,7 @@ export default function ResultsClient() {
               onClick={() => hasMore && setDisplayCount((n) => n + pageSize)}
               disabled={!hasMore}
               aria-label={hasMore ? `Show more results (${Math.min(remaining, pageSize)} more)` : 'Showing all results'}
-              className="rounded-xl border border-primary/40 bg-primary/10 px-6 py-3 text-sm font-medium text-gray-900 transition hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-primary/10"
+              className="rounded-full border border-primary/35 bg-primary/10 px-6 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-primary/10"
             >
               {hasMore ? (
                 <>
