@@ -15,9 +15,13 @@ export interface Business {
   breakdown?: AnalysisBreakdown | null;
 }
 
+/** Filter by whether a listing has been analyzed (has score/breakdown data). */
+export type AnalysisStatusFilter = 'all' | 'analyzed' | 'pending';
+
 export interface ResultsFiltersState {
   scoreMin: string;
   scoreMax: string;
   hasWebsite: string;
   checked: string;
+  analysisStatus: AnalysisStatusFilter;
 }

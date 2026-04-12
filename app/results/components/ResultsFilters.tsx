@@ -13,6 +13,7 @@ const DEFAULT_FILTERS: ResultsFiltersState = {
   scoreMax: '',
   hasWebsite: 'all',
   checked: 'all',
+  analysisStatus: 'all',
 };
 
 export default function ResultsFilters({
@@ -24,7 +25,8 @@ export default function ResultsFilters({
     filters.scoreMin !== DEFAULT_FILTERS.scoreMin ||
     filters.scoreMax !== DEFAULT_FILTERS.scoreMax ||
     filters.hasWebsite !== DEFAULT_FILTERS.hasWebsite ||
-    filters.checked !== DEFAULT_FILTERS.checked;
+    filters.checked !== DEFAULT_FILTERS.checked ||
+    filters.analysisStatus !== DEFAULT_FILTERS.analysisStatus;
 
   return (
     <div
@@ -45,7 +47,7 @@ export default function ResultsFilters({
           Clear filters
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <div>
           <label htmlFor="filter-score-min" className="mb-1.5 block text-sm font-medium text-emerald-950/90">
             Score Min
@@ -108,6 +110,27 @@ export default function ResultsFilters({
             <option value="all">All</option>
             <option value="checked">Checked</option>
             <option value="unchecked">Unchecked</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="filter-analysis" className="mb-1.5 block text-sm font-medium text-emerald-950/90">
+            Analysis
+          </label>
+          <select
+            id="filter-analysis"
+            value={filters.analysisStatus}
+            onChange={(e) =>
+              onChange({
+                ...filters,
+                analysisStatus: e.target.value as ResultsFiltersState['analysisStatus'],
+              })
+            }
+            className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            aria-label="Filter by analysis status"
+          >
+            <option value="all">All</option>
+            <option value="analyzed">Analyzed</option>
+            <option value="pending">Not analyzed</option>
           </select>
         </div>
       </div>

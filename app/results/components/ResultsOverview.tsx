@@ -1,63 +1,47 @@
 'use client';
 
-import type { Business } from '../types';
+import { useId, useState } from 'react';
+import type { AnalysisStatusFilter, Business, ResultsFiltersState } from '../types';
+import { formatLocationDisplay, isBusinessAnalyzed, resolveListingScore } from '../businessUtils';
+
+export type ResultsOverviewFilterPatch =
+  | { type: 'reset' }
+  | { type: 'hasWebsite'; value: 'all' | 'yes' | 'no' }
+  | { type: 'analysisStatus'; value: AnalysisStatusFilter }
+  | { type: 'scoreExact'; value: number };
 
 interface ResultsOverviewProps {
   businesses: Business[];
-}
-
-function averageScore(businesses: Business[]): number | null {
-  const scores = businesses
-    .map((b) =>
-      typeof b.final_score === 'number'
-        ? b.final_score
-        : typeof b.breakdown?.web_standards_score === 'number'
-          ? b.breakdown.web_standards_score
-          : null
-    )
-    .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
-  if (scores.length === 0) return null;
-  return Math.round(scores.reduce((sum, n) => sum + n, 0) / scores.length);
-}
-
-function trendPoints(businesses: Business[]): number[] {
-  const scores = businesses
-    .map((b) =>
-      typeof b.final_score === 'number'
-        ? b.final_score
-        : typeof b.breakdown?.web_standards_score === 'number'
-          ? b.breakdown.web_standards_score
-          : null
-    )
-    .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
-  if (scores.length === 0) return [45, 48, 46, 53, 50, 55, 57];
-
-  const buckets = 7;
-  const chunk = Math.max(1, Math.ceil(scores.length / buckets));
-  const points: number[] = [];
-  for (let i = 0; i < scores.length; i += chunk) {
-    const slice = scores.slice(i, i + chunk);
-    const avg = Math.round(slice.reduce((sum, n) => sum + n, 0) / slice.length);
-    points.push(avg);
-  }
-
-  while (points.length < buckets) {
-    points.push(points[points.length - 1] ?? 50);
-  }
-  return points.slice(0, buckets);
+  location: string;
+  activeFilters?: ResultsFiltersState;
+  onApplyFilter?: (patch: ResultsOverviewFilterPatch) => void;
 }
 
 type Point = { x: number; y: number };
 
-function pointCoordinates(points: number[], width: number, height: number): Point[] {
-  const max = 100;
-  const min = 0;
-  const span = Math.max(1, max - min);
-  const xStep = width / Math.max(1, points.length - 1);
+interface DialMetricProps {
+  label: string;
+  value: number | null;
+  active?: boolean;
+  onClick?: () => void;
+  ariaLabel?: string;
+}
 
-  return points.map((p, i) => {
-    const x = i * xStep;
-    const y = height - ((p - min) / span) * height;
+function averageOf(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((sum, n) => sum + n, 0) / values.length);
+}
+
+function trendCoordinates(points: number[], width: number, height: number): Point[] {
+  if (points.length === 0) return [];
+
+  const xStep = width / Math.max(1, points.length - 1);
+  const topPadding = 8;
+  const drawableHeight = Math.max(1, height - topPadding - 8);
+
+  return points.map((value, index) => {
+    const x = index * xStep;
+    const y = topPadding + (1 - Math.max(0, Math.min(100, value)) / 100) * drawableHeight;
     return { x, y };
   });
 }
@@ -65,6 +49,7 @@ function pointCoordinates(points: number[], width: number, height: number): Poin
 function smoothLinePath(coords: Point[]): string {
   if (coords.length === 0) return '';
   if (coords.length === 1) return `M ${coords[0].x} ${coords[0].y}`;
+
   let d = `M ${coords[0].x.toFixed(2)} ${coords[0].y.toFixed(2)}`;
   for (let i = 0; i < coords.length - 1; i += 1) {
     const current = coords[i];
@@ -77,140 +62,346 @@ function smoothLinePath(coords: Point[]): string {
   return d;
 }
 
-function areaPath(coords: Point[], chartHeight: number): string {
+function areaPath(coords: Point[], baseline: number): string {
   if (coords.length === 0) return '';
   const start = coords[0];
   const end = coords[coords.length - 1];
   const line = smoothLinePath(coords);
-  return `${line} L ${end.x.toFixed(2)} ${chartHeight} L ${start.x.toFixed(2)} ${chartHeight} Z`;
+  return `${line} L ${end.x.toFixed(2)} ${baseline} L ${start.x.toFixed(2)} ${baseline} Z`;
 }
 
-function statusLabel(avg: number | null): string {
-  if (avg === null) return 'No score data';
-  if (avg >= 81) return 'Strong';
-  if (avg >= 61) return 'Healthy';
-  if (avg >= 41) return 'Needs work';
-  return 'Critical';
+/** Band edges align with vertical guide lines: [0, mid₀₁, mid₁₂, …, width]. */
+function bandBoundaries(coords: Point[], chartWidth: number): number[] {
+  const n = coords.length;
+  if (n === 0) return [0, chartWidth];
+  const b: number[] = [0];
+  for (let i = 1; i < n; i += 1) {
+    b.push((coords[i - 1].x + coords[i].x) / 2);
+  }
+  b.push(chartWidth);
+  return b;
 }
 
-export default function ResultsOverview({ businesses }: ResultsOverviewProps) {
+function bandRange(boundaries: number[], index: number): { start: number; width: number } {
+  const start = boundaries[index] ?? 0;
+  const end = boundaries[index + 1] ?? start;
+  return { start, width: Math.max(0, end - start) };
+}
+
+
+function parseExactScoreFilter(filters?: ResultsFiltersState): number | null {
+  if (!filters || filters.scoreMin === '' || filters.scoreMax === '') return null;
+  const min = Number.parseInt(filters.scoreMin, 10);
+  const max = Number.parseInt(filters.scoreMax, 10);
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  return min === max ? min : null;
+}
+
+function countSitesAtScore(businesses: Business[], score: number): number {
+  return businesses.filter((b) => resolveListingScore(b) === score).length;
+}
+
+function DialMetric({
+  label,
+  value,
+  active = false,
+  onClick,
+  ariaLabel,
+}: DialMetricProps) {
+  const normalized = value === null ? 0 : Math.max(0, Math.min(100, value));
+  const radius = 30;
+  const circumference = 2 * Math.PI * radius;
+  const strokeLength = (normalized / 100) * circumference;
+  const toneClass = 'stroke-primary';
+  const valueLabel = value === null ? '—' : `${Math.round(value)}`;
+
+  const frameClass = `flex h-full min-h-0 flex-col items-center justify-center rounded-2xl border p-3 text-center transition ${
+    active
+      ? 'border-primary/50 bg-primary/10 shadow-sm'
+      : 'border-stone-200 bg-white hover:border-primary/35 hover:bg-primary/5'
+  }`;
+
+  const content = (
+    <>
+      <div className="relative mx-auto h-24 w-24 shrink-0 sm:h-28 sm:w-28 xl:h-32 xl:w-32">
+        <svg viewBox="0 0 84 84" className="h-full w-full" aria-hidden>
+          <circle cx="42" cy="42" r={radius} className="fill-none stroke-stone-200" strokeWidth="8" />
+          <circle
+            cx="42"
+            cy="42"
+            r={radius}
+            className={`fill-none ${toneClass}`}
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray={`${strokeLength} ${circumference}`}
+            transform="rotate(-90 42 42)"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-3xl font-bold tabular-nums leading-none text-emerald-950 xl:text-4xl">{valueLabel}</span>
+        </div>
+      </div>
+      <p className="mt-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 xl:text-sm">{label}</p>
+    </>
+  );
+
+  if (!onClick) {
+    return <div className={frameClass}>{content}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel ?? label}
+      aria-pressed={active}
+      className={`${frameClass} focus:outline-none focus:ring-2 focus:ring-primary/30`}
+    >
+      {content}
+    </button>
+  );
+}
+
+export default function ResultsOverview({
+  businesses,
+  location,
+  activeFilters,
+  onApplyFilter,
+}: ResultsOverviewProps) {
+  const chartIdBase = useId().replace(/:/g, '');
+  const [bandTooltip, setBandTooltip] = useState<{
+    index: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
   if (businesses.length === 0) return null;
+
+  const apply = onApplyFilter ?? (() => {});
+
+  const scores = businesses
+    .map(resolveListingScore)
+    .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
+  const hasScoreData = scores.length > 0;
+
+  const avgWeb = averageOf(scores);
+  const pagespeedValues = businesses
+    .map((b) => b.breakdown?.pagespeed_score)
+    .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
+  const avgPs = averageOf(pagespeedValues);
 
   const total = businesses.length;
   const noWebsite = businesses.filter((b) => !b.website).length;
   const withWebsite = total - noWebsite;
-  const analyzed = businesses.filter((b) => b.breakdown || typeof b.final_score === 'number').length;
-  const avg = averageScore(businesses);
-  const points = trendPoints(businesses);
-  const chartWidth = 280;
-  const chartHeight = 70;
-  const coords = pointCoordinates(points, chartWidth, 60);
-  const line = smoothLinePath(coords);
-  const area = areaPath(coords, chartHeight);
-  const last = coords[coords.length - 1] ?? { x: chartWidth, y: 35 };
+  const analyzed = businesses.filter(isBusinessAnalyzed).length;
 
-  const websiteCoverage = Math.round((withWebsite / total) * 100);
-  const analyzedRate = Math.round((analyzed / total) * 100);
-  const withWebsiteCount = total - noWebsite;
+  const websitePct = Math.round((withWebsite / total) * 100);
+  const analyzedPct = Math.round((analyzed / total) * 100);
 
+  const sortedScores = [...scores].sort((a, b) => a - b);
+  const sparklineWidth = 480;
+  const sparklineHeight = 220;
+  const sparklineBaseline = sparklineHeight - 4;
+  const sparklineCoords = trendCoordinates(sortedScores, sparklineWidth, sparklineHeight);
+  const sparklinePath = smoothLinePath(sparklineCoords);
+  const sparklineArea = areaPath(sparklineCoords, sparklineBaseline);
+  const boundaries = bandBoundaries(sparklineCoords, sparklineWidth);
+  const locationLabel = formatLocationDisplay(location);
+
+  const f = activeFilters;
+  const websiteYesActive = f?.hasWebsite === 'yes';
+  const analyzedActive = f?.analysisStatus === 'analyzed';
+  const exactScoreFilter = parseExactScoreFilter(f);
+  const selectedIndices =
+    exactScoreFilter === null
+      ? []
+      : sortedScores.reduce<number[]>((acc, score, index) => {
+          if (score === exactScoreFilter) acc.push(index);
+          return acc;
+        }, []);
   return (
     <section className="mb-4 rounded-2xl border border-stone-200/90 bg-stone-50/80 p-4 shadow-lg shadow-black/5 sm:p-5">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <article className="rounded-3xl border border-stone-200/90 bg-white p-5 xl:col-span-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-[2rem] leading-none font-bold tracking-tight text-emerald-950">
+      <div className="mb-4 flex justify-start">
+        <p className="max-w-full truncate text-xl font-bold tracking-tight text-emerald-950 sm:text-2xl">
+          {locationLabel}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:items-stretch">
+        <article className="flex min-h-0 flex-col rounded-3xl border border-stone-200/90 bg-white p-4 sm:p-5 xl:col-span-7 xl:h-full">
+          <div className="shrink-0">
+            <h3 className="text-[1.35rem] font-bold leading-tight tracking-tight text-emerald-950 sm:text-xl">
               Freshness trend
             </h3>
-            {avg !== null && (
-              <span className="rounded-2xl bg-primary px-4 py-2 text-[2rem] leading-none font-bold text-emerald-950">
-                Avg. {avg}
-              </span>
-            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Sorted-score trend with a lighter overlay. Click a band between the guides to load profiles at that
+              score.
+            </p>
           </div>
-          <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-32 w-full" aria-hidden>
-            <defs>
-              <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="rgba(169, 215, 106, 0.35)" />
-                <stop offset="100%" stopColor="rgba(169, 215, 106, 0.02)" />
-              </linearGradient>
-            </defs>
-            <line
-              x1="0"
-              y1={chartHeight - 1}
-              x2={chartWidth}
-              y2={chartHeight - 1}
-              stroke="rgba(17, 24, 39, 0.12)"
-              strokeWidth="1"
-            />
-            <path d={area} fill="url(#trend-fill)" />
-            <path
-              d={line}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-emerald-950"
-            />
-            <circle cx={last.x} cy={last.y} r="4.5" fill="currentColor" className="text-emerald-950" />
-            <circle cx={last.x} cy={last.y} r="7.5" fill="none" stroke="rgba(0,0,0,0.14)" strokeWidth="1" />
-          </svg>
-          <div className="mt-2 flex justify-between px-1 text-3xl font-medium text-gray-500">
-            <span>M</span>
-            <span>T</span>
-            <span>W</span>
-            <span>T</span>
-            <span>F</span>
-            <span>S</span>
-            <span>S</span>
-          </div>
+
+          {hasScoreData ? (
+            <>
+              <div className="relative mt-4 flex min-h-70 flex-1 flex-col rounded-2xl border border-stone-100 bg-white p-3 shadow-sm sm:min-h-80 xl:min-h-0">
+                <svg
+                  viewBox={`0 0 ${sparklineWidth} ${sparklineHeight}`}
+                  className="h-full min-h-65 w-full flex-1"
+                  role="img"
+                  aria-label="Freshness trend sorted score line chart; vertical guides mark selection bands"
+                >
+                  <defs>
+                    <linearGradient id={`${chartIdBase}-freshness-trend-fill`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(169, 215, 106, 0.30)" />
+                      <stop offset="100%" stopColor="rgba(169, 215, 106, 0.04)" />
+                    </linearGradient>
+                    {selectedIndices.map((index) => {
+                      const range = bandRange(boundaries, index);
+                      return (
+                        <clipPath key={`freshness-clip-${index}`} id={`${chartIdBase}-freshness-sel-${index}`}>
+                          <rect x={range.start} y="0" width={range.width} height={sparklineHeight} />
+                        </clipPath>
+                      );
+                    })}
+                  </defs>
+                  <path d={sparklineArea} fill={`url(#${chartIdBase}-freshness-trend-fill)`} />
+                  {selectedIndices.map((index) => (
+                    <path
+                      key={`freshness-selected-area-${index}`}
+                      d={sparklineArea}
+                      fill="rgba(169, 215, 106, 0.22)"
+                      clipPath={`url(#${chartIdBase}-freshness-sel-${index})`}
+                    />
+                  ))}
+                  {boundaries.slice(1, -1).map((bx, i) => (
+                    <line
+                      key={`freshness-guide-${i}`}
+                      x1={bx}
+                      y1="0"
+                      x2={bx}
+                      y2={sparklineBaseline}
+                      stroke="rgba(17, 24, 39, 0.09)"
+                      strokeWidth="1"
+                      strokeDasharray="2 8"
+                    />
+                  ))}
+                  <path
+                    d={sparklinePath}
+                    fill="none"
+                    stroke="rgba(169, 215, 106, 0.72)"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  {selectedIndices.map((index) => (
+                    <path
+                      key={`freshness-line-sel-${index}`}
+                      d={sparklinePath}
+                      fill="none"
+                      stroke="rgba(169, 215, 106, 0.96)"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      clipPath={`url(#${chartIdBase}-freshness-sel-${index})`}
+                    />
+                  ))}
+                  {sortedScores.map((score, index) => {
+                    const range = bandRange(boundaries, index);
+                    return (
+                      <g
+                        key={`freshness-band-${index}-${score}`}
+                        onClick={() => apply({ type: 'scoreExact', value: score })}
+                        onMouseEnter={(e) => {
+                          setBandTooltip({
+                            index,
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                          });
+                        }}
+                        onMouseMove={(e) => {
+                          setBandTooltip({
+                            index,
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                          });
+                        }}
+                        onMouseLeave={() => setBandTooltip(null)}
+                        className="cursor-pointer"
+                      >
+                        <rect
+                          x={range.start}
+                          y="0"
+                          width={range.width}
+                          height={sparklineHeight}
+                          fill="transparent"
+                        />
+                        <title>{`Score ${score}`}</title>
+                      </g>
+                    );
+                  })}
+                </svg>
+                {bandTooltip !== null && (
+                  <div
+                    className="pointer-events-none fixed z-100 w-max max-w-[16rem] rounded-xl border border-stone-200/90 bg-white px-3 py-2.5 text-left shadow-lg shadow-black/10"
+                    style={{
+                      left: (() => {
+                        const pad = 14;
+                        const approxW = 260;
+                        const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
+                        return Math.max(8, Math.min(bandTooltip.clientX + pad, vw - approxW - 16));
+                      })(),
+                      top: bandTooltip.clientY + 14,
+                    }}
+                    role="tooltip"
+                  >
+                    {(() => {
+                      const score = sortedScores[bandTooltip.index];
+                      const n = countSitesAtScore(businesses, score);
+                      return (
+                        <>
+                          <p className="text-md font-semibold text-emerald-950">
+                            {n} {n === 1 ? 'site' : 'sites'} 
+                          </p>
+                          <p className="text-lg font-bold text-emerald-950">{score}/100</p>
+                          <p className="mt-1 text-xs font-semibold text-primary">Click to see </p>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+                <div
+                  className="mt-2 flex w-full justify-between gap-0.5 text-[10px] font-medium tabular-nums text-gray-500 sm:text-xs"
+                  aria-hidden
+                >
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="mt-6 text-sm text-gray-500">
+              No scores yet. Analyze listings to generate the freshness trend.
+            </p>
+          )}
         </article>
 
-        <article className="rounded-3xl border border-stone-200/90 bg-white p-5 xl:col-span-4">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-4xl font-bold tracking-tight text-emerald-950">Web standards</h3>
-            <span className="rounded-full bg-primary/25 px-4 py-2 text-xl font-semibold text-emerald-950">
-              {statusLabel(avg)}
-            </span>
-          </div>
-          <p className="mt-6 text-7xl font-bold tabular-nums leading-none text-emerald-950">
-            {avg ?? '—'}
-          </p>
-          <div className="mt-6 flex items-center justify-between">
-            <p className="text-4xl font-medium text-gray-500">Score</p>
-            <p className="text-4xl font-medium tabular-nums text-gray-500">100</p>
-          </div>
-          <div className="mt-4 h-4 rounded-full bg-stone-200 p-0.5">
-            <div
-              className="h-full rounded-full bg-primary transition-[width] duration-300"
-              style={{ width: `${Math.min(100, Math.max(0, avg ?? 0))}%` }}
-            />
-          </div>
-        </article>
+        <article className="flex min-h-0 flex-col rounded-3xl border border-stone-200/90 bg-white p-4 sm:p-5 xl:col-span-5 xl:h-full">
+          <h3 className="shrink-0 text-lg font-bold tracking-tight text-emerald-950 sm:text-xl">
+            Performance snapshot
+          </h3>
 
-        <article className="rounded-3xl border border-stone-200/90 bg-white p-5 xl:col-span-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Coverage snapshot</h3>
-          <div className="mt-4 grid grid-cols-1 gap-3">
-            <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">No website</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-emerald-950">{noWebsite}</p>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">With website</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-emerald-950">{withWebsiteCount}</p>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Analyzed</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-emerald-950">{analyzed}</p>
-            </div>
-          </div>
-          <div className="mt-4 space-y-2">
-            <div className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium text-gray-700">
-              Website coverage: {websiteCoverage}%
-            </div>
-            <div className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium text-gray-700">
-              Analysis rate: {analyzedRate}%
-            </div>
+          <div className="mt-4 grid min-h-0 flex-1 grid-cols-1 grid-rows-4 gap-3 sm:grid-cols-2 sm:grid-rows-2 sm:gap-4">
+            <DialMetric label="Web standards" value={avgWeb} />
+            <DialMetric label="PageSpeed" value={avgPs} />
+            <DialMetric
+              label="Website coverage"
+              value={websitePct}
+              active={websiteYesActive}
+              onClick={() => apply({ type: 'hasWebsite', value: 'yes' })}
+              ariaLabel="Filter to listings with a website"
+            />
+            <DialMetric
+              label="Analysis completion"
+              value={analyzedPct}
+              active={analyzedActive}
+              onClick={() => apply({ type: 'analysisStatus', value: 'analyzed' })}
+              ariaLabel="Filter to analyzed listings"
+            />
           </div>
         </article>
       </div>

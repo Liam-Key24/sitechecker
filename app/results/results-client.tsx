@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Business, ResultsFiltersState } from './types';
+import { isBusinessAnalyzed } from './businessUtils';
 import ResultsLoading from './components/ResultsLoading';
 import ResultsOverview from './components/ResultsOverview';
 import ResultsHeader from './components/ResultsHeader';
@@ -14,6 +15,7 @@ const DEFAULT_FILTERS: ResultsFiltersState = {
   scoreMax: '',
   hasWebsite: 'all',
   checked: 'all',
+  analysisStatus: 'all',
 };
 
 export type ResultsClientProps = {
@@ -42,6 +44,7 @@ export default function ResultsClient({
 
   const pageSize = clampSearchLimitFromString(limit, 20);
   const [displayCount, setDisplayCount] = useState(pageSize);
+  const resultsSectionRef = useRef<HTMLSectionElement | null>(null);
 
   const handleAnalyze = useCallback(async (id: string, options?: { force?: boolean }) => {
     try {
@@ -271,6 +274,8 @@ export default function ResultsClient({
       if (filters.hasWebsite === 'no' && b.website) return false;
       if (filters.checked === 'checked' && !b.checked) return false;
       if (filters.checked === 'unchecked' && b.checked) return false;
+      if (filters.analysisStatus === 'analyzed' && !isBusinessAnalyzed(b)) return false;
+      if (filters.analysisStatus === 'pending' && isBusinessAnalyzed(b)) return false;
       if (
         filters.scoreMin &&
         (b.final_score === null || b.final_score < parseInt(filters.scoreMin, 10))
@@ -383,7 +388,36 @@ export default function ResultsClient({
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto w-[min(112rem,calc(100%-1.5rem))] px-3 py-8 sm:px-5 md:py-10">
-        <ResultsOverview businesses={businesses} />
+        <ResultsOverview
+          businesses={businesses}
+          location={location}
+          activeFilters={filters}
+          onApplyFilter={(patch) => {
+            setFilters((prev) => {
+              if (patch.type === 'reset') return DEFAULT_FILTERS;
+              if (patch.type === 'hasWebsite') return { ...prev, hasWebsite: patch.value };
+              if (patch.type === 'analysisStatus') return { ...prev, analysisStatus: patch.value };
+              if (patch.type === 'scoreExact') {
+                const score = String(patch.value);
+                return { ...prev, scoreMin: score, scoreMax: score };
+              }
+              return prev;
+            });
+            if (patch.type === 'scoreExact') {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  resultsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+              });
+            }
+          }}
+        />
+        <section
+          ref={resultsSectionRef}
+          id="results-list"
+          aria-label="Results list"
+          className="scroll-mt-6"
+        >
         <ResultsHeader
           location={location}
           totalCount={businesses.length}
@@ -438,6 +472,7 @@ export default function ResultsClient({
             </button>
           </div>
         )}
+        </section>
       </div>
     </div>
   );
